@@ -142,7 +142,7 @@
 - Aturan: user edit manual kadang; eksekusi oleh AI hanya saat diminta eksplisit.
 - 2026-09-10: file scanner dilarang dihapus (keputusan user — DICABUT 2026-09-14, kamera/scan dibuang total); TOTAL CSV tidak dipercaya sebagai stock akhir sampai user menjelaskan rumus/sumbernya.
 - [x] 2026-09-10 Cabut total_awal + total_pembanding — SO 12 Agu diselamatkan sebagai 188 baris saldo-pembuka di `transaksi` (237 nol dilewati); `total` satu-satunya sumber stock. SQL DROP oleh user.
-- [ ] U30–U32/E30–E32 + teks F7 (`test_list.md`, PRD) kadaluarsa pasca-eceran-saja (dropdown + tolak-merah tak ada lagi) — revisi dokumen saat UAT berikutnya.
+- [x] 2026-09-20 Revisi U30–U32/E30–E32 + teks F7 pasca-eceran-saja — U22/U30-U32/E30-E32 + F7 diselaraskan (form manual eceran-saja, tolak non-eceran pesan baru; `isi_per_gudang` jalur pesanan).
 - [~] Misteri +Rp 18.000 — DITUTUP 2026-09-20: error sisi sheet (`#VALUE!` baris Mie `45 PCS/ CTN`, 144rb) membuat total sheet tak valid; dashboard app = Σ(QTY×HARGA) CSV persis, tak diubah. Perbaikan sheet (qty Mie → `45`): di luar aplikasi.
 - SOP server: terminal user saja (AI tak pernah menyalakan server; hanya curl/REST verifikasi + bilang "restart"); 1 proses; tiap restart = semua logout (sesi memori).
 

@@ -66,7 +66,7 @@
 - [ ] **U36.** Kategori: ketik di form baru/edit → saran muncul (7 kanonik BASAH/KERING/CHEMICAL/DAIRY/KEMASAN/FROZEN/PERLENGKAPAN + existing); simpan → tersimpan uppercase; varian huruf tak menambah kategori baru.
 
 ### Regresi + penutup
-- [ ] **U22.** Input manual (`/input`): cari-nama → kandidat → Masuk/Keluar (dropdown satuan/gudang + preview konversi, tolak merah bila tanpa pasangan) / form baru 10 field (tanpa kolom ID, ID auto `MNL-…`, + field Isi per Satuan Gudang opsional); Masuk wajib `totalBayar` (avg); route `/tambah-barang` + `/scan` sudah mati.
+- [ ] **U22.** Input manual (`/input`): cari-nama → kandidat → Masuk/Keluar eceran-saja (label `Jumlah ({eceran})`, tanpa dropdown satuan; tombol mati bila ≤0) / form baru 10 field (tanpa kolom ID, ID auto `MNL-…`, + field Isi per Satuan Gudang opsional); Masuk wajib `totalBayar` (avg); route `/tambah-barang` + `/scan` sudah mati.
 - [ ] **U23.** History filter/pagination + chart + fast moving normal; kartu Total Aset (moving-average + `N item belum ada harga`) + ikon Unduh → modal (tanggal + preview bermutasi + Unduh kini/per-tanggal, tanpa elemen meluber); tabel Explorer (toggle Kartu/Tabel, sort header, expand baris, 20/baris).
 - [ ] **U24.** Bersih-bersih: selesaikan/hapus baris uji; cek DB 0 sisa bila fresh.
 - [ ] **U46.** Poll ringan `?ringan=1`: poll/visible tanpa katalog (1742 vs 44022 bytes), riwayat sama; mount/submit/lapor tetap fetch penuh.
@@ -81,10 +81,10 @@
 - [ ] **U28.** Submit 2x cepat nama sama persis → satu sukses + satu gagal constraint; DB tepat 1 baris (uji unique index).
 - [ ] **U29.** Nama berspasi berlebih → ternormalisasi (trim + rapat); hasil akhir sama persis → 409.
 
-### Konversi terstruktur (isi_per_gudang)
-- [ ] **U30.** Keluar pilih satuan gudang berpasangan (cth 1 pack Bakso SP) → stock kurang 60 pcs + pesan `1 pack (= 60 pcs)`; preview form cocok.
-- [ ] **U31.** Keluar pilih satuan gudang TANPA pasangan (cth Beras/Karung) → merah tolak + stock tetap; pesan sebut `Lengkapi Isi per Satuan Gudang` (NULL = terkunci-SO).
-- [ ] **U32.** Form baru isi `Isi per Satuan Gudang` (cth 24) → transaksi berikutnya opsi kemasan terbuka + konversi benar; kosongkan → terkunci-SO.
+### Konversi terstruktur (isi_per_gudang — form manual eceran-saja 2026-09-18)
+- [ ] **U30.** Masuk/Keluar ketik qty eceran langsung (cth 60 pcs) → stock ∓60 + `transaksi` +1 sesuai arah; tanpa dropdown satuan, tanpa konversi di form; info dus/pack hanya teks di kartu Inventory.
+- [ ] **U31.** Satuan non-eceran via API (cth Karung) → 400 merah `Kirim dalam {eceran} (sistem eceran-saja)` + stock/transaksi tetap.
+- [ ] **U32.** Form baru/edit isi `Isi per Satuan Gudang` (cth 24) → tersimpan di master (dipakai jalur pesanan otomatis); form manual tetap eceran-saja; kosongkan → NULL = terkunci-SO (jalur pesanan tanpa pasangan → merah `Lengkapi Isi per Satuan Gudang`).
 
 ### Edit/hapus barang (kartu inventory)
 - [ ] **U33.** Edit kartu (nama/merk/kategori/restock/ket/gudang/isi/harga) → tersimpan + list refresh; nama duplikat → 409 + sebut ID; satuan tanpa ketik-ulang persis → 400; ID + stock tak terkirim.
@@ -140,8 +140,8 @@
 - [ ] **E27.** Kartu kandidat (nama • kategori • satuan • stock) + tombol `Pakai ini`; baris baru hanya bila user paksa buat baru.
 - [ ] **E28.** Satu sukses + satu gagal unik; count `lower(nama)` = 1.
 - [ ] **E29.** Nama tersimpan rapi tanpa spasi berlebih; duplikat hasil normalisasi → E25.
-- [ ] **E30.** `total` −60 (satuan), `transaksi` +1 `Keluar` satuan; pesan `1 pack (= 60 pcs)`.
-- [ ] **E31.** Merah tak-ada-konversi; `total` dan `transaksi` tak berubah.
-- [ ] **E32.** Opsi kemasan muncul + faktor dipakai; bila dikosongkan → E31.
+- [ ] **E30.** `total` ∓qty eceran, `transaksi` +1 sesuai arah; tanpa baris konversi di form.
+- [ ] **E31.** Merah `Kirim dalam {eceran} (sistem eceran-saja)`; `total` dan `transaksi` tak berubah.
+- [ ] **E32.** `isi_per_gudang` tersimpan di master (jalur pesanan); form manual tetap eceran; NULL = terkunci-SO (jalur pesanan tanpa pasangan → merah `Lengkapi Isi...`).
 - [ ] **E33.** Metadata berubah + list refresh; merah duplikat / satuan-tanpa-ketik; ID/stock tetap.
 - [ ] **E34.** Modal detail + `Ya, hapus` → hilang total; 409 bila dipakai order; Batalkan → utuh.
