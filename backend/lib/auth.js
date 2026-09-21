@@ -1,6 +1,7 @@
-// Auth gudang: scrypt + cookie manual + sesi opaque di memori + rate-limit.
+// Auth gudang: scrypt + cookie manual + sesi opaque + rate-limit.
 // Tanpa dep baru: scrypt via crypto bawaan. Hoist dari server.js lama (dulu di bawah, dipakai di atas).
 const crypto = require('crypto');
+const { sb } = require('../../db');
 
 // Hash format `scrypt$salt$hash` (pola sama untuk password outlet menyusul).
 function hashKataSandi(plain) {
@@ -39,36 +40,69 @@ function bacaCookie(req, nama) {
   return '';
 }
 
-const sesiGudang = new Map(); // token -> expMs (restart server = logout ulang, password tetap)
-const UMUR_SESI_GUDANG_MS = 24 * 3600 * 1000;
-function wajibGudang(req, res, next) {
-  if (String(process.env.GUDANG_GATE || '').toLowerCase() === 'off') return next(); // kill-switch uji
-  const tok = bacaCookie(req, 'sesi_gudang');
-  const exp = tok ? sesiGudang.get(tok) : 0;
-  if (!tok || !exp || exp < Date.now()) {
-    if (tok) sesiGudang.delete(tok);
-    return res.status(401).json({ error: 'Login gudang dulu.' });
+// Sesi persisten di Supabase (tabel `sesi`): aman multi-instance + cold start (Vercel serverless).
+// Baris: { token, jenis: 'gudang'|'outlet', token_outlet, exp }. Pengganti Map in-memory.
+async function simpanSesi(tok, { jenis, tokenOutlet = null, expMs }) {
+  const r = await sb.from('sesi').upsert({
+    token: tok,
+    jenis,
+    token_outlet: tokenOutlet,
+    exp: new Date(expMs).toISOString(),
+  });
+  if (r.error) throw new Error(r.error.message);
+}
+async function ambilSesi(tok) {
+  if (!tok) return null;
+  const r = await sb.from('sesi').select('*').eq('token', tok).maybeSingle();
+  if (r.error) throw new Error(r.error.message);
+  const s = r.data;
+  if (!s) return null;
+  if (!s.exp || new Date(s.exp).getTime() < Date.now()) {
+    await hapusSesi(tok); // sapu oportunistik (pengganti interval prune di serverless)
+    return null;
   }
-  next();
+  return s;
+}
+async function hapusSesi(tok) {
+  if (!tok) return;
+  const r = await sb.from('sesi').delete().eq('token', tok);
+  if (r.error) throw new Error(r.error.message);
 }
 
-// Sesi outlet: token sesi -> {tokenOutlet, exp} (terikat 1 link; restart = logout ulang).
-// Cookie per link (sesi_outlet_<token>): banyak link hidup berdampingan, login B tak menendang A.
+const UMUR_SESI_GUDANG_MS = 24 * 3600 * 1000;
+async function wajibGudang(req, res, next) {
+  if (String(process.env.GUDANG_GATE || '').toLowerCase() === 'off') return next(); // kill-switch uji
+  try {
+    const tok = bacaCookie(req, 'sesi_gudang');
+    const s = await ambilSesi(tok);
+    if (!tok || !s || s.jenis !== 'gudang') {
+      return res.status(401).json({ error: 'Login gudang dulu.' });
+    }
+    next();
+  } catch {
+    res.status(500).json({ error: 'Sesi tak terbaca.' });
+  }
+}
+
+// Sesi outlet terikat 1 link (banyak link hidup berdampingan, login B tak menendang A).
 // Tutup tab = login ulang via flag sessionStorage di frontend (cookie HttpOnly 24 jam ditimpa saat masuk ulang).
-const sesiOutlet = new Map();
 const UMUR_SESI_OUTLET_MS = 24 * 3600 * 1000;
 function namaCookieOutlet(token) {
   const t = String(token || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 32) || 'x';
   return `sesi_outlet_${t}`;
 }
-function wajibOutlet(req, res, next) {
-  const tok = bacaCookie(req, namaCookieOutlet(req.params.token));
-  const sesi = tok ? sesiOutlet.get(tok) : null;
-  // Mismatch/kedaluwarsa = 401 saja TANPA menghapus (sesi itu mungkin masih sah untuk link asalnya di tab sebelah).
-  if (!tok || !sesi || sesi.exp < Date.now() || sesi.tokenOutlet !== String(req.params.token || '').trim()) {
-    return res.status(401).json({ error: 'Login outlet dulu.' });
+async function wajibOutlet(req, res, next) {
+  try {
+    const tok = bacaCookie(req, namaCookieOutlet(req.params.token));
+    const s = await ambilSesi(tok);
+    // Mismatch/kedaluwarsa = 401 saja TANPA menghapus (sesi itu mungkin masih sah untuk link asalnya di tab sebelah).
+    if (!tok || !s || s.jenis !== 'outlet' || s.token_outlet !== String(req.params.token || '').trim()) {
+      return res.status(401).json({ error: 'Login outlet dulu.' });
+    }
+    next();
+  } catch {
+    res.status(500).json({ error: 'Sesi tak terbaca.' });
   }
-  next();
 }
 
 // HTTPS di belakang proxy (ngrok/hosting): percayai X-Forwarded-Proto (lihat `trust proxy` di server.js).
@@ -84,12 +118,12 @@ function atributSecure(req) {
 }
 
 // Sapu entri kedaluwarsa tiap jam (sesi 24 jam + rate 1 mnt); tanpa ubah perilaku.
+// Sesi disapu via DB (jalan di proses persistent; di serverless tak dipanggil + sapu oportunistik di ambilSesi).
 function mulaiPruneSesi() {
-  const sapu = () => {
+  const sapu = async () => {
     try {
       const kini = Date.now();
-      for (const [tok, exp] of sesiGudang) if (!(exp > kini)) sesiGudang.delete(tok);
-      for (const [tok, s] of sesiOutlet) if (!s || !(s.exp > kini)) sesiOutlet.delete(tok);
+      await sb.from('sesi').delete().lt('exp', new Date(kini).toISOString());
       for (const [kunci, list] of emberRate) {
         const sisa = (list || []).filter(t => kini - t < 60000);
         if (sisa.length) emberRate.set(kunci, sisa);
@@ -103,7 +137,7 @@ function mulaiPruneSesi() {
 
 module.exports = {
   hashKataSandi, cekKataSandi, kenaRate, bacaCookie,
-  sesiGudang, UMUR_SESI_GUDANG_MS, wajibGudang,
-  sesiOutlet, UMUR_SESI_OUTLET_MS, namaCookieOutlet, wajibOutlet,
+  simpanSesi, ambilSesi, hapusSesi, UMUR_SESI_GUDANG_MS, wajibGudang,
+  UMUR_SESI_OUTLET_MS, namaCookieOutlet, wajibOutlet,
   apakahHttps, atributSecure, mulaiPruneSesi,
 };

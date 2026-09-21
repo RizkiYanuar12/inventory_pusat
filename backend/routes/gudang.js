@@ -3,7 +3,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { sb } = require('../../db');
-const { hashKataSandi, cekKataSandi, kenaRate, bacaCookie, sesiGudang, UMUR_SESI_GUDANG_MS, wajibGudang, atributSecure } = require('../lib/auth');
+const { hashKataSandi, cekKataSandi, kenaRate, bacaCookie, simpanSesi, ambilSesi, hapusSesi, UMUR_SESI_GUDANG_MS, wajibGudang, atributSecure } = require('../lib/auth');
 
 router.post('/api/gudang/masuk', async (req, res) => {
   try {
@@ -21,7 +21,7 @@ router.post('/api/gudang/masuk', async (req, res) => {
       return res.status(401).json({ sukses: false, pesan: 'Password salah.' });
     }
     const tok = crypto.randomBytes(32).toString('hex');
-    sesiGudang.set(tok, Date.now() + UMUR_SESI_GUDANG_MS);
+    await simpanSesi(tok, { jenis: 'gudang', expMs: Date.now() + UMUR_SESI_GUDANG_MS });
     res.setHeader('Set-Cookie', `sesi_gudang=${tok}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax${atributSecure(req)}`);
     res.json({ sukses: true, pesan: 'Masuk sebagai gudang.' });
   } catch (err) {
@@ -30,22 +30,25 @@ router.post('/api/gudang/masuk', async (req, res) => {
   }
 });
 
-router.post('/api/gudang/keluar', (req, res) => {
+router.post('/api/gudang/keluar', async (req, res) => {
   const tok = bacaCookie(req, 'sesi_gudang');
-  if (tok) sesiGudang.delete(tok);
+  if (tok) await hapusSesi(tok);
   res.setHeader('Set-Cookie', `sesi_gudang=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${atributSecure(req)}`);
   res.json({ sukses: true, pesan: 'Keluar.' });
 });
 
-router.get('/api/gudang/sesi', (req, res) => {
+router.get('/api/gudang/sesi', async (req, res) => {
   if (String(process.env.GUDANG_GATE || '').toLowerCase() === 'off') return res.json({ masuk: true });
-  const tok = bacaCookie(req, 'sesi_gudang');
-  const exp = tok ? sesiGudang.get(tok) : 0;
-  if (!tok || !exp || exp < Date.now()) {
-    if (tok) sesiGudang.delete(tok);
-    return res.status(401).json({ masuk: false });
+  try {
+    const tok = bacaCookie(req, 'sesi_gudang');
+    const s = await ambilSesi(tok);
+    if (!tok || !s || s.jenis !== 'gudang') {
+      return res.status(401).json({ masuk: false });
+    }
+    res.json({ masuk: true });
+  } catch {
+    res.status(500).json({ masuk: false });
   }
-  res.json({ masuk: true });
 });
 
 // Ganti password: SELALU wajib sesi (tanpa bootstrap terbuka).

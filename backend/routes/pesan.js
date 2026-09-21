@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { sb, nowIso } = require('../../db');
-const { wajibGudang, wajibOutlet, sesiOutlet, UMUR_SESI_OUTLET_MS, namaCookieOutlet, hashKataSandi, cekKataSandi, kenaRate, atributSecure } = require('../lib/auth');
+const { wajibGudang, wajibOutlet, simpanSesi, UMUR_SESI_OUTLET_MS, namaCookieOutlet, hashKataSandi, cekKataSandi, kenaRate, atributSecure } = require('../lib/auth');
 const { jakartaParts, hitungSlot, formatWaktuBukti, pesanDibuka, PESAN_TUTUP } = require('../lib/waktu');
 const { buatRingkasan, tambahRiwayat, buatRingkasanKirim, buatAlasan } = require('../lib/ringkas');
 const { kanonikSatuan } = require('../lib/konversi');
@@ -359,9 +359,9 @@ router.post('/api/pesan/:token/surat/:idKirim/konfirmasi', wajibOutlet, async (r
 
 // ---- Login outlet (username + password; username pre-set gudang, password self-set outlet) ----
 const SALAH_OUTLET = 'Username atau password salah.';
-function sesiOutletBaru(tokenOutlet, req, res) {
+async function sesiOutletBaru(tokenOutlet, req, res) {
   const tok = crypto.randomBytes(32).toString('hex');
-  sesiOutlet.set(tok, { tokenOutlet: String(tokenOutlet).trim(), exp: Date.now() + UMUR_SESI_OUTLET_MS });
+  await simpanSesi(tok, { jenis: 'outlet', tokenOutlet: String(tokenOutlet).trim(), expMs: Date.now() + UMUR_SESI_OUTLET_MS });
   res.setHeader('Set-Cookie', `${namaCookieOutlet(tokenOutlet)}=${tok}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax${atributSecure(req)}`);
 }
 
@@ -387,7 +387,7 @@ router.post('/api/pesan/:token/masuk', async (req, res) => {
     if (!cekKataSandi(password, outlet.password_outlet)) {
       return res.status(401).json({ sukses: false, pesan: SALAH_OUTLET });
     }
-    sesiOutletBaru(req.params.token, req, res);
+    await sesiOutletBaru(req.params.token, req, res);
     res.json({ sukses: true, pesan: `Masuk sebagai ${outlet.nama_outlet}.` });
   } catch (err) {
     console.error(err);
@@ -415,7 +415,7 @@ router.post('/api/pesan/:token/password-awal', async (req, res) => {
     }
     const up = await sb.from('outlet').update({ password_outlet: hashKataSandi(password) }).eq('token', String(req.params.token).trim()).select('slug');
     if (up.error) throw new Error(up.error.message);
-    sesiOutletBaru(req.params.token, req, res);
+    await sesiOutletBaru(req.params.token, req, res);
     res.json({ sukses: true, pesan: 'Password dibuat. Selamat datang!' });
   } catch (err) {
     console.error(err);

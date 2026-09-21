@@ -33,7 +33,8 @@ app.use(cors({
   },
 }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
+// Di Vercel: static dilayani platform (frontend/dist tak ikut bundle function).
+if (!process.env.VERCEL) app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 // Data: Supabase 5 tabel (barang_inventory, transaksi, pesanan, pengiriman, outlet).
 // Akses Supabase terpusat di db.js (root, tetap di root agar require('.../db') stabil).
@@ -44,10 +45,12 @@ app.use('/', require('./routes/pesan'));
 app.use('/', require('./routes/gudang'));
 app.use('/', require('./routes/vendor'));
 app.use('/', require('./routes/opname'));
+app.use('/', require('./routes/cron'));
 
 // SPA fallback (prod port 3000): link langsung seperti /pesan/<slug>-<token> harus
 // dilayani index.html, bukan 404. Express 5: '/{*splat}'. Dilewati untuk /api.
-app.get('/{*splat}', (req, res, next) => {
+// Di Vercel: fallback ditangani rewrites vercel.json.
+if (!process.env.VERCEL) app.get('/{*splat}', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
 });
