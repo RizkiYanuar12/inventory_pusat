@@ -56,11 +56,11 @@ const getCategoryColors = (kategori) => {
     return { bg: '#f8f9fa', text: '#6c757d', border: '#dee2e6' };
 };
 
-// Form edit metadata (ID + stock terkunci; satuan butuh ketik-ulang konfirmasi)
+// Form edit metadata + stock (overwrite mentah; ID terkunci; satuan butuh ketik-ulang konfirmasi)
 function EditForm({ item, opsiKategoriList, onSelesai }) {
     const [f, setF] = useState({
         nama: item.nama || '', varian: item.varian || '', kategori: item.kategori || '',
-        restock: item.threshold ?? '', keterangan: item.keterangan || '',
+        restock: item.threshold ?? '', stock: item.stock ?? '', keterangan: item.keterangan || '',
         satuanGudang: item.satuanGrosir || '', isi: item.isiPerGrosir ?? '',
         harga: item.hargaBarang ?? '', satuanBaru: '', konfirmasiSatuan: '',
     });
@@ -76,6 +76,7 @@ function EditForm({ item, opsiKategoriList, onSelesai }) {
         const payload = {
             nama: f.nama, varian: f.varian, kategori: f.kategori,
             restock: f.restock === '' ? undefined : Number(f.restock),
+            total: f.stock === '' ? undefined : Number(f.stock),
             keterangan: f.keterangan,
             satuanGudang: f.satuanGudang, isiPerGudang: f.isi,
             hargaBarang: f.harga === '' ? null : Number(f.harga),
@@ -107,6 +108,10 @@ function EditForm({ item, opsiKategoriList, onSelesai }) {
                 <Form.Control size='sm' value={f.varian} onChange={set('varian')} />
             </Form.Group>
             <div className='d-flex gap-2'>
+                <Form.Group className='mb-2 flex-fill'>
+                    <Form.Label className='text-muted small mb-1'>Stock ({item.satuanEceran})</Form.Label>
+                    <Form.Control size='sm' type='number' inputMode='numeric' min='0' value={f.stock} onChange={set('stock')} />
+                </Form.Group>
                 <Form.Group className='mb-2 flex-fill'>
                     <Form.Label className='text-muted small mb-1'>Batas Restock</Form.Label>
                     <Form.Control size='sm' type='number' inputMode='numeric' min='0' value={f.restock} onChange={set('restock')} />

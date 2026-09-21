@@ -158,17 +158,17 @@ router.post('/api/tambahBarangBaru', wajibGudang, async (req, res) => {
   }
 });
 
-// Ubah metadata barang (ID + stock terkunci; satuan wajib konfirmasi ketik-ulang)
+// Ubah metadata + total stock (overwrite mentah via kartu; ID terkunci; satuan wajib konfirmasi ketik-ulang)
 router.put('/api/barang/:id', wajibGudang, async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     const ada = await sb.from('barang_inventory').select('*').eq('id_barang', id).maybeSingle();
     if (ada.error) throw new Error(ada.error.message);
     if (!ada.data) return res.status(404).json({ sukses: false, pesan: 'Barang tidak ditemukan.' });
-    if ('id' in req.body || 'stock' in req.body || 'total' in req.body) {
-      return res.status(400).json({ sukses: false, pesan: 'ID dan stock tidak bisa diubah. Stock hanya via Masuk/Keluar.' });
+    if ('id' in req.body) {
+      return res.status(400).json({ sukses: false, pesan: 'ID tidak bisa diubah.' });
     }
-    const { nama, varian, kategori, restock, satuanEceran, konfirmasiSatuan, satuanGudang, isiPerGudang, keterangan, hargaBarang } = req.body;
+    const { nama, varian, kategori, restock, total, satuanEceran, konfirmasiSatuan, satuanGudang, isiPerGudang, keterangan, hargaBarang } = req.body;
     const patch = {};
     if (nama !== undefined) {
       const namaBersih = String(nama || '').trim().replace(/\s+/g, ' ');
@@ -189,6 +189,10 @@ router.put('/api/barang/:id', wajibGudang, async (req, res) => {
     if (restock !== undefined) {
       if (!(Number(restock) >= 0)) return res.status(400).json({ sukses: false, pesan: 'Batas restock harus angka >= 0.' });
       patch.minimum_stock = Number(restock);
+    }
+    if (total !== undefined) {
+      if (!(Number(total) >= 0)) return res.status(400).json({ sukses: false, pesan: 'Stock harus angka >= 0.' });
+      patch.total = Number(total);
     }
     if (satuanEceran !== undefined) {
       const satuanBaru = kanonikSatuan(satuanEceran);
