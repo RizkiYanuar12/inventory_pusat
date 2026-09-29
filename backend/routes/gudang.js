@@ -38,7 +38,6 @@ router.post('/api/gudang/keluar', async (req, res) => {
 });
 
 router.get('/api/gudang/sesi', async (req, res) => {
-  if (String(process.env.GUDANG_GATE || '').toLowerCase() === 'off') return res.json({ masuk: true });
   try {
     const tok = bacaCookie(req, 'sesi_gudang');
     const s = await ambilSesi(tok);

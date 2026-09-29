@@ -71,7 +71,6 @@ async function hapusSesi(tok) {
 
 const UMUR_SESI_GUDANG_MS = 24 * 3600 * 1000;
 async function wajibGudang(req, res, next) {
-  if (String(process.env.GUDANG_GATE || '').toLowerCase() === 'off') return next(); // kill-switch uji
   try {
     const tok = bacaCookie(req, 'sesi_gudang');
     const s = await ambilSesi(tok);

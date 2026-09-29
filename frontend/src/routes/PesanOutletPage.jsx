@@ -81,6 +81,14 @@ export default function PesanOutletPage() {
     }
     useEffect(() => { if (masuk) muat();}, [token, masuk]);
 
+    // Judul tab browser = nama outlet (pre-login: slug dipercantik; post-login: nama asli DB).
+    useEffect(() => {
+        const cantik = (s) => String(s || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        // ponytail: pre-login pakai slug (tanpa endpoint publik baru); ganti ke nama DB setelah login.
+        document.title = data?.outlet ? `${data.outlet} • Pemesanan` : slug ? `${cantik(slug)} • Pemesanan` : 'Pemesanan Outlet';
+        return () => { document.title = 'Inventory Pusat'; };
+    }, [data?.outlet, slug]);
+
     async function submitMasuk(e) {
         e?.preventDefault();
         if (!uNama.trim() || !uSandi) {
