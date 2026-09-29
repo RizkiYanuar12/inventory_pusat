@@ -242,7 +242,7 @@ export default function PesanOutletPage() {
         return (
             <div className='outlet-wrap'>
             <Container className='outlet-login'>
-                <p className='text-center small fw-bold mb-1' style={{ letterSpacing: '0.14em', color: '#7a5200' }}>GUDANG PUSAT • PEMESANAN</p>
+                <p className='text-center small fw-bold mb-1' style={{ letterSpacing: '0.14em', color: '#7a5200' }}>OUTLET • PEMESANAN</p>
                 <h2 className='outlet-nama text-center mb-1'>{slug || 'Outlet'}</h2>
                 <p className='text-center text-muted small mb-3'>
                     {modeAwal ? 'Buat password pertamamu (sekali saja)' : 'Masuk untuk pesan & pantau kiriman'}
