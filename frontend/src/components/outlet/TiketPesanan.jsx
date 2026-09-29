@@ -85,14 +85,15 @@ function Alur({ status }) {
 }
 
 function BarisItem({ it }) {
+    const satuan = it.satuan || 'pcs';
     const kanan = it.keputusan === 'TOLAK'
         ? <span className='text-danger small'>✕{it.keterangan ? ` ${it.keterangan}` : ''}</span>
         : it.qtyKirim != null
-            ? <span className='text-success small'>✓ kirim {it.qtyKirim}</span>
-            : <span className='text-muted small'>×{it.qtyPesan}</span>;
+            ? <span className='text-success small'>✓ kirim {it.qtyKirim} {satuan}</span>
+            : <span className='text-muted small'>×{it.qtyPesan} {satuan}</span>;
     return (
         <div className='d-flex justify-content-between gap-2 py-1' style={{ borderBottom: '1px solid #f1f3f5' }}>
-            <span className='small text-truncate'>{it.nama}{it.varian ? ` • ${it.varian}` : ''} <span className='text-muted'>×{it.qtyPesan}</span></span>
+            <span className='small text-truncate'>{it.nama}{it.varian ? ` • ${it.varian}` : ''} <span className='text-muted'>×{it.qtyPesan} {satuan}</span></span>
             <span className='flex-shrink-0 text-end'>{kanan}</span>
         </div>
     );

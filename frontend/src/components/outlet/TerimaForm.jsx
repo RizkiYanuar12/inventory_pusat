@@ -84,7 +84,7 @@ export default function TerimaForm({ tokenOutlet, idKirim, onSelesai }) {
                             <div>
                                 <div className='fw-medium small'>{it.nama}</div>
                                 <div className='text-muted' style={{ fontSize: '11px' }}>
-                                    Dikirim {it.jumlahKirim}{it.jumlahTerima != null && <> → diterima {it.jumlahTerima}</>}
+                                    Dikirim {it.jumlahKirim} {it.satuan || 'pcs'}{it.jumlahTerima != null && <> → diterima {it.jumlahTerima} {it.satuan || 'pcs'}</>}
                                     {it.keterangan && <> • {it.keterangan}</>}
                                 </div>
                             </div>
@@ -117,7 +117,7 @@ export default function TerimaForm({ tokenOutlet, idKirim, onSelesai }) {
                         <Card.Body>
                             <Form.Check
                                 type='checkbox'
-                                label={<strong style={{ fontSize: '15px', lineHeight: 1.35 }}>{it.nama} — {it.jumlahKirim} pcs</strong>}
+                                label={<strong style={{ fontSize: '15px', lineHeight: 1.35 }}>{it.nama} — {it.jumlahKirim} {it.satuan || 'pcs'}</strong>}
                                 checked={lap.ceklis === true}
                                 onChange={e => setLap(i, { ceklis: e.target.checked })}
                             />
@@ -125,7 +125,7 @@ export default function TerimaForm({ tokenOutlet, idKirim, onSelesai }) {
                                 <div className='mt-2'>
                                     <Form.Control
                                         type='number' inputMode='numeric' min='0' size='sm' className='mb-1'
-                                        placeholder={`Jumlah diterima (dikirim ${it.jumlahKirim})`}
+                                        placeholder={`Jumlah diterima (dikirim ${it.jumlahKirim} ${it.satuan || 'pcs'})`}
                                         value={lap.jumlahTerima || ''}
                                         onChange={e => setLap(i, { jumlahTerima: e.target.value })}
                                     />

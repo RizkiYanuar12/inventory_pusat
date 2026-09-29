@@ -7,14 +7,16 @@ const { jakartaParts, formatWaktuBukti, NAMA_BULAN } = require('../lib/waktu');
 const { tambahRiwayat } = require('../lib/ringkas');
 const {
   cariPengiriman, pengirimanKeJson, simpanPengiriman,
-  cariPesanan, simpanPesanan, mirrorPesanan, tulisNotifikasi,
+  cariPesanan, simpanPesanan, mirrorPesanan, tulisNotifikasi, terapkanSatuanLive,
 } = require('../lib/data');
 
 router.get('/api/pengiriman', wajibGudang, async (req, res) => {
   try {
     const r = await sb.from('pengiriman').select('*').order('dibuat_pada', { ascending: false });
     if (r.error) throw new Error(r.error.message);
-    res.json(r.data.map(x => pengirimanKeJson(x)));
+    const daftar = r.data.map(x => pengirimanKeJson(x));
+    for (const d of daftar) d.items = await terapkanSatuanLive(d.items);
+    res.json(daftar);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -213,7 +215,7 @@ router.get('/api/surat-jalan/:idKirim', wajibGudang, async (req, res) => {
             nama: namaLengkap(lp),
             note: String(lp.keterangan || '').trim(),
             qty: Number(lp.qtyPesan) || 0,
-            satuan: String(lp.satuan || '').trim() || '-',
+            satuan: (refMap.get(String(lp.id || '').trim()) || {}).satuan || String(lp.satuan || '').trim() || '-',
             harga: null,
             total: null,
           };

@@ -9,7 +9,7 @@ const { kanonikSatuan } = require('../lib/konversi');
 const {
   cariOutletByToken, buatIdPesan, pesananKeJson, cariPesanan, simpanPesanan,
   tulisNotifikasi, buatPengiriman, cariPengiriman, pengirimanKeJson, simpanPengiriman,
-  mirrorPesanan,
+  mirrorPesanan, terapkanSatuanLive,
 } = require('../lib/data');
 
 // Gudang: daftar semua pesanan, terbaru-di-atas
@@ -17,7 +17,9 @@ router.get('/api/pesanan', wajibGudang, async (req, res) => {
   try {
     const r = await sb.from('pesanan').select('*').order('dibuat_pada', { ascending: false });
     if (r.error) throw new Error(r.error.message);
-    res.json(r.data.map(x => pesananKeJson(x)));
+    const daftar = r.data.map(x => pesananKeJson(x));
+    for (const d of daftar) d.items = await terapkanSatuanLive(d.items);
+    res.json(daftar);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -70,6 +72,7 @@ router.get('/api/pesan/:token', wajibOutlet, async (req, res) => {
       const info = infoKirim[id] || {};
       return pesananKeJson(x, info.idKirim || null, info);
     });
+    for (const m of milik) m.items = await terapkanSatuanLive(m.items);
     const dibuka = pesanDibuka(new Date());
 
     res.json({
@@ -291,6 +294,7 @@ router.get('/api/pesan/:token/surat/:idKirim', wajibOutlet, async (req, res) => 
     const r = await suratMilik(req.params.token, req.params.idKirim);
     if (r.err) return res.status(r.err).json({ error: r.pesan });
     const data = pengirimanKeJson(r.kirim, true);
+    data.items = await terapkanSatuanLive(data.items);
     data.sudahDikonfirmasi = ['DITERIMA', 'DITERIMA SEBAGIAN'].includes(r.kirim.status);
     res.json(data);
   } catch (err) {

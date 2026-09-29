@@ -352,7 +352,7 @@ export default function PesanOutletPage() {
     return (
         <div className='outlet-wrap'>
         <Container className='outlet-kolom py-3 px-3'>
-            <p className='text-center small fw-bold mb-1' style={{ letterSpacing: '0.14em', color: '#7a5200', fontSize: '11px' }}>GUDANG PUSAT • PEMESANAN</p>
+            <p className='text-center small fw-bold mb-1' style={{ letterSpacing: '0.14em', color: '#7a5200', fontSize: '11px' }}>OUTLET • PEMESANAN</p>
             <h2 className='outlet-nama text-center'>{data.outlet}</h2>
             <div className='outlet-jadwal mt-2 mb-2'>
                 <span className='chip'>Masuk: {data.jadwal?.batchMasuk}</span>

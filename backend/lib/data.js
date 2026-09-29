@@ -126,6 +126,18 @@ async function cariPesanan(idPesan) {
   return r.data || null;
 }
 
+// Overlay satuan live dari master agar update gudang otomatis tercermin di tiket lama.
+// Fallback ke snapshot bila barang terhapus. Best-effort: gagal baca master -> items apa adanya.
+async function terapkanSatuanLive(items) {
+  if (!Array.isArray(items) || items.length === 0) return items;
+  try {
+    const ref = await sb.from('barang_inventory').select('id_barang,satuan');
+    if (ref.error || !ref.data) return items;
+    const peta = new Map((ref.data || []).map(b => [String(b.id_barang).trim(), kanonikSatuan(b.satuan) || 'pcs']));
+    return items.map(it => ({ ...it, satuan: peta.get(String(it.id || '').trim()) || it.satuan || 'pcs' }));
+  } catch { return items; }
+}
+
 async function simpanPesanan(row) {
   const r = await sb.from('pesanan').update({
     status: row.status, items_json: row.items_json, ringkasan: row.ringkasan,
@@ -325,6 +337,7 @@ async function buatPengiriman(outlet, items, idPesan = null) {
     id: row.id_barang,
     nama: row.nama_barang,
     varian: row.merk || '',
+    satuan: kanonikSatuan(row.satuan) || 'pcs',
     jumlahKirim: qty,
     jumlahTerima: null,
     ceklis: false,
@@ -379,7 +392,7 @@ async function buatPengiriman(outlet, items, idPesan = null) {
 module.exports = {
   initDb, buatIdKirim, buatIdBarang, buatIdPesan, buatIdSesi, sesiTerbuka,
   cariPengiriman, pengirimanKeJson, simpanPengiriman,
-  cariOutletByToken, pesananKeJson, cariPesanan, simpanPesanan, mirrorPesanan,
+  cariOutletByToken, pesananKeJson, cariPesanan, simpanPesanan, mirrorPesanan, terapkanSatuanLive,
   catatTransaksi, cekThreshold, RandomSamplingChecking, scheduleRandomSampling,
   tulisNotifikasi, buatPengiriman,
 };

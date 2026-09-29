@@ -87,7 +87,7 @@ export default function ManualVerifikasiKirim({ idKirim }) {
                     <Card.Body className='py-2 d-flex justify-content-between align-items-center'>
                         <div>
                             <div className='fw-medium small'>{l.nama}{l.varian ? ` • ${l.varian}` : ''}</div>
-                            <div className='text-muted' style={{ fontSize: '11px' }}>{l.jumlahKirim} pcs</div>
+                            <div className='text-muted' style={{ fontSize: '11px' }}>{l.jumlahKirim} {l.satuan || 'pcs'}</div>
                         </div>
                         {ceklis[i]
                             ? <Badge bg='success'>✓ masuk paket</Badge>

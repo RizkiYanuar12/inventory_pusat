@@ -55,7 +55,7 @@ function PutusForm({ pesanan, onSelesai }) {
                 return (
                 <div key={`${it.id}#${i}`} className='mb-2'>
                     <div className='d-flex justify-content-between align-items-center'>
-                        <span className='small'>{it.nama} <strong>x{it.qtyPesan}</strong></span>
+                        <span className='small'>{it.nama} <strong>x{it.qtyPesan} {it.satuan || 'pcs'}</strong></span>
                         <div className='d-flex gap-1'>
                             <Button size='sm' variant={m === 'PENUHI' ? 'success' : 'outline-success'}
                                 onClick={() => setMode(md => ({ ...md, [i]: 'PENUHI' }))}>Penuhi</Button>
@@ -65,7 +65,7 @@ function PutusForm({ pesanan, onSelesai }) {
                     </div>
                     {m === 'PENUHI' && (
                         <Form.Control size='sm' type='number' inputMode='numeric' min='0' className='mt-1'
-                            placeholder={`Kirim (= ${it.qtyPesan}), kosongkan bila penuh`}
+                            placeholder={`Kirim (= ${it.qtyPesan} ${it.satuan || 'pcs'}), kosongkan bila penuh`}
                             value={qty[i] ?? ''}
                             onChange={e => setQty(q => ({ ...q, [i]: e.target.value }))} />
                     )}
@@ -104,13 +104,13 @@ function RingkasanPutus({ pesanan }) {
     const barisPenuhi = (it, i) => (
         <div key={`p-${i}`} className='small py-1 d-flex gap-1' style={garis}>
             <span className='text-success fw-bold'>✓</span>
-            <span>{it.nama} <strong>x{it.qtyKirim ?? it.qtyPesan}</strong></span>
+            <span>{it.nama} <strong>x{it.qtyKirim ?? it.qtyPesan} {it.satuan || 'pcs'}</strong></span>
         </div>
     );
     const barisTolak = (it, i) => (
         <div key={`t-${i}`} className='small py-1 d-flex gap-1 text-muted' style={garis}>
             <span className='text-danger fw-bold'>✕</span>
-            <span>{it.nama} <strong>x{it.qtyPesan}</strong>{it.keterangan && <> — {it.keterangan}</>}</span>
+              <span>{it.nama} <strong>x{it.qtyPesan} {it.satuan || 'pcs'}</strong>{it.keterangan && <> — {it.keterangan}</>}</span>
         </div>
     );
     return (
@@ -477,9 +477,9 @@ export default function DaftarPengirimanPage() {
                                                         <div className='d-flex justify-content-between align-items-center flex-wrap gap-1'>
                                                             <strong>{it.nama}</strong>
                                                             <span className='d-flex align-items-center gap-2'>
-                                                                <span className='text-muted'>Terkirim: {it.jumlahKirim}</span>
+                                                                <span className='text-muted'>Terkirim: {it.jumlahKirim} {it.satuan || 'pcs'}</span>
                                                                 <span className='text-muted'>|</span>
-                                                                <span className='text-muted'>Diterima: {sudahTerima ? it.jumlahTerima : '-'}</span>
+                                                                <span className='text-muted'>Diterima: {sudahTerima ? `${it.jumlahTerima} ${it.satuan || 'pcs'}` : '-'}</span>
                                                                 {sudahTerima && <Badge bg={it.ceklis ? 'success' : 'warning'}>{it.ceklis ? 'Sesuai' : 'Sebagian'}</Badge>}
                                                             </span>
                                                         </div>
