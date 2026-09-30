@@ -22,8 +22,6 @@ async function buatIdKirim() {
 }
 
 // Tambah barang baru (id opsional -> auto MNL urut global; tanpa kolom ID di UI manual)
-// Dari nomor TERBESAR (bukan jumlah baris): kebal lubang bekas-hapus (392 baris tapi max 0430).
-// Balapan 2 HP ditutup retry 10x; nomor bekas-hapus tak pernah dipakai ulang (arsip order aman).
 async function buatIdBarang() {
   const m = await sb.from('barang_inventory').select('id_barang').like('id_barang', 'MNL-%').order('id_barang', { ascending: false }).limit(100);
   if (m.error) throw new Error(m.error.message);
@@ -154,7 +152,6 @@ async function simpanPesanan(row) {
   return r.data[0];
 }
 
-// Mirror status Pesanan dari peristiwa Pengiriman (best-effort: gagal mirror tak menggagalkan op utama;
 // sumber kebenaran operasional tetap Pengiriman; skip untuk susulan tanpa id_pesan).
 async function mirrorPesanan(idPesan, status, catatan) {
   try {
