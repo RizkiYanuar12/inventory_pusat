@@ -44,7 +44,7 @@ router.get('/api/opname/:id', wajibGudang, async (req, res) => {
     if (!s) return res.status(404).json({ error: 'Sesi tidak ditemukan.' });
     const it = await sb.from('opname_item').select('*').eq('id_sesi', s.id_sesi);
     if (it.error) throw new Error(it.error.message);
-    const br = await sb.from('barang_inventory').select('id_barang,nama_barang,merk,satuan,total,harga_barang');
+    const br = await sb.from('barang_inventory').select('id_barang,nama_barang,merk,kategori,satuan,total,harga_barang');
     if (br.error) throw new Error(br.error.message);
     const map = new Map((br.data || []).map(b => [String(b.id_barang).trim(), b]));
     const items = (it.data || []).map(x => {
@@ -55,6 +55,7 @@ router.get('/api/opname/:id', wajibGudang, async (req, res) => {
         id: x.id_barang,
         nama: b ? b.nama_barang : x.id_barang,
         merk: b ? (b.merk || '') : '',
+        kategori: b ? (b.kategori || '') : '',
         satuan: b ? (kanonikSatuan(b.satuan) || 'pcs') : 'pcs',
         ada: !!b,
         sistem: Number(x.sistem_qty),
