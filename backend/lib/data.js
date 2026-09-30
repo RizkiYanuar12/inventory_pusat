@@ -22,11 +22,18 @@ async function buatIdKirim() {
 }
 
 // Tambah barang baru (id opsional -> auto MNL urut global; tanpa kolom ID di UI manual)
+// Dari nomor TERBESAR (bukan jumlah baris): kebal lubang bekas-hapus (392 baris tapi max 0430).
+// Balapan 2 HP ditutup retry 10x; nomor bekas-hapus tak pernah dipakai ulang (arsip order aman).
 async function buatIdBarang() {
+  const m = await sb.from('barang_inventory').select('id_barang').like('id_barang', 'MNL-%').order('id_barang', { ascending: false }).limit(100);
+  if (m.error) throw new Error(m.error.message);
+  let mulai = 1;
+  for (const row of m.data || []) {
+    const t = /MNL-(\d+)$/.exec(String(row.id_barang || '').trim());
+    if (t) { mulai = Number(t[1]) + 1; break; }
+  }
   for (let i = 0; i < 10; i++) {
-    const r = await sb.from('barang_inventory').select('id_barang', { count: 'exact', head: true }).like('id_barang', 'MNL-%');
-    if (r.error) throw new Error(r.error.message);
-    const calon = `MNL-${String((r.count || 0) + 1 + i).padStart(4, '0')}`;
+    const calon = `MNL-${String(mulai + i).padStart(4, '0')}`;
     const cek = await sb.from('barang_inventory').select('id_barang').eq('id_barang', calon).maybeSingle();
     if (cek.error) throw new Error(cek.error.message);
     if (!cek.data) return calon;

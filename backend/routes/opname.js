@@ -37,6 +37,26 @@ router.get('/api/opname', wajibGudang, async (req, res) => {
   }
 });
 
+// Ringkasan 1 sesi (untuk poll realtime 3 HP; ringan tanpa items/master)
+router.get('/api/opname/:id/ringkas', wajibGudang, async (req, res) => {
+  try {
+    const s = await ambilSesi(req.params.id);
+    if (!s) return res.status(404).json({ error: 'Sesi tidak ditemukan.' });
+    const it = await sb.from('opname_item').select('fisik_qty,sistem_qty').eq('id_sesi', s.id_sesi);
+    if (it.error) throw new Error(it.error.message);
+    const rows = it.data || [];
+    res.json({
+      idSesi: s.id_sesi, status: s.status,
+      total: rows.length,
+      dihitung: rows.filter(x => x.fisik_qty != null).length,
+      bergerak: rows.filter(x => x.fisik_qty != null && Number(x.fisik_qty) !== Number(x.sistem_qty)).length,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Detail sesi + item + nama/satuan terkini + selisih vs stock SAAT INI (idempoten untuk retry putus)
 router.get('/api/opname/:id', wajibGudang, async (req, res) => {
   try {
@@ -206,7 +226,8 @@ router.post('/api/opname/:id/putus', wajibGudang, async (req, res) => {
   }
 });
 
-// Batalkan sesi terbuka (tanpa tulis apa pun)
+// Batalkan sesi terbuka = HAPUS permanen (tanpa tulis stock apa pun, tanpa jejak arsip).
+// Status BATAL tidak dipakai lagi agar daftar sesi tidak penuh sampah.
 router.post('/api/opname/:id/batal', wajibGudang, async (req, res) => {
   try {
     const s = await ambilSesi(req.params.id);
@@ -214,9 +235,11 @@ router.post('/api/opname/:id/batal', wajibGudang, async (req, res) => {
     if (!['HITUNG', 'REVIEW'].includes(s.status)) {
       return res.status(409).json({ sukses: false, pesan: `Sesi ${s.status}, tak bisa dibatalkan.` });
     }
-    const up = await sb.from('opname_sesi').update({ status: 'BATAL', ditutup_pada: nowIso() }).eq('id_sesi', s.id_sesi);
-    if (up.error) throw new Error(up.error.message);
-    res.json({ sukses: true, pesan: `Sesi ${s.id_sesi} dibatalkan (tanpa perubahan stock).` });
+    const hi = await sb.from('opname_item').delete().eq('id_sesi', s.id_sesi);
+    if (hi.error) throw new Error(hi.error.message);
+    const hs = await sb.from('opname_sesi').delete().eq('id_sesi', s.id_sesi);
+    if (hs.error) throw new Error(hs.error.message);
+    res.json({ sukses: true, pesan: `Sesi ${s.id_sesi} dihapus (tanpa perubahan stock).` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ sukses: false, pesan: 'Gagal membatalkan: ' + err.message });

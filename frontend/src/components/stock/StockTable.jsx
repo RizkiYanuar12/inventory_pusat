@@ -441,7 +441,7 @@ export default function StockTable({ items, semua, onBerubah, mode = 'kartu' }) 
                                 <span>{hapus.stock} {hapus.satuanEceran}</span>
                             </div>
                             <Alert variant="warning" className="small mt-2 mb-0">
-                                Riwayat transaksi milik barang ini ikut terhapus. Batal bila barang pernah dipakai order.
+                                Barang hilang dari katalog & tak bisa dipesan. Riwayat transaksinya tetap tersimpan di History.
                             </Alert>
                         </div>
                     )}

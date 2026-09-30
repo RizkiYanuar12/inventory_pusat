@@ -18,19 +18,12 @@ export async function fetchTransaksi() {
 }
 
 export async function tambahBarangBaru(payload) {
-    try {
-        const res = await fetch(`${BASE_URL}/tambahBarangBaru`,{
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
-        })
-        if (!res.ok){
-            throw new Error("Gagal Menambahkan Barang ke Database")
-        }
-        return await res.json();
-    } catch (error){
-        return error;
-    }
+    const res = await fetch(`${BASE_URL}/tambahBarangBaru`,{
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    return handleRes(res, 'Gagal menambah barang');
 }
 
 export async function ubahBarang(id, payload) {
@@ -48,19 +41,12 @@ export async function hapusBarang(id) {
 }
 
 export async function prosesTransaksi(payload){
-    try{
-        const res = await fetch(`${BASE_URL}/prosesTransaksi`,{
-            method: 'POST',
-            headers: {'content-type': 'application/json'},
-            body: JSON.stringify(payload)
-        })
-        if (!res.ok){
-            throw new Error("Proses transaksi mengalami kegagalan")
-        }
-        return await res.json()
-    } catch(error){
-        return error;
-    }
+    const res = await fetch(`${BASE_URL}/prosesTransaksi`,{
+        method: 'POST',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    return handleRes(res, 'Gagal memproses transaksi')
 }
 
 async function handleRes(res, pesanGagal) {
@@ -113,6 +99,11 @@ export async function fetchOpname() {
 export async function fetchOpnameDetail(id) {
     const res = await fetch(`${BASE_URL}/opname/${encodeURIComponent(id)}`);
     return handleRes(res, 'Gagal mengambil detail opname');
+}
+
+export async function fetchOpnameRingkas(id) {
+    const res = await fetch(`${BASE_URL}/opname/${encodeURIComponent(id)}/ringkas`);
+    return handleRes(res, 'Gagal mengambil ringkasan opname');
 }
 
 export async function mulaiOpname() {

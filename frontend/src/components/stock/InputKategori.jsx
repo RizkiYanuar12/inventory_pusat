@@ -13,7 +13,7 @@ export default function InputKategori({ value, onChange, opsi, size, placeholder
   if (modeBaru) {
     return (
       <div>
-        <Form.Control size={size} value={value} onChange={onChange}
+        <Form.Control size={size} value={value} onChange={e => onChange(e.target.value)}
           placeholder='Ketik kategori baru…' aria-label='Kategori baru' autoFocus />
         <Button variant='link' size='sm' className='p-0 mt-1 text-decoration-none'
           onClick={() => { setModeBaru(false); onChange(''); }}>

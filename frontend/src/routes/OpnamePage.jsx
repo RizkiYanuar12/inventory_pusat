@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Card, Button, Form, Table, Alert, Badge } from 'react-bootstrap';
-import { fetchOpname, fetchOpnameDetail, mulaiOpname, hitungOpname, reviewOpname, putusOpname, batalOpname, kembaliOpname } from '../api/client';
+import { fetchOpname, fetchOpnameDetail, fetchOpnameRingkas, mulaiOpname, hitungOpname, reviewOpname, putusOpname, batalOpname, kembaliOpname } from '../api/client';
 import { usePagination } from '../hooks/usePagination';
 import { opsiKategori } from '../utils/kategori';
 
@@ -29,7 +29,8 @@ export default function OpnamePage() {
         try { setDaftar(await fetchOpname()); } catch { setDaftar([]); }
     }, []);
 
-    // Gabung nilai server tanpa menimpa ketikan lokal (fokus/kotor dipertahankan).
+    // Gabung nilai server tanpa menimpa/menghapus ketikan lokal (upsert-only:
+    // UI tak pernah mengosongkan fisik, jadi server-kosong = data basi, bukan kebenaran).
     const gabungDetail = useCallback((d) => {
         setBuka(d);
         const kotorKini = kotorRef.current || {};
@@ -39,7 +40,6 @@ export default function OpnamePage() {
             for (const it of d.items || []) {
                 if (kotorKini[it.id] || fokus === it.id) continue;
                 if (it.fisik != null) next[it.id] = String(it.fisik);
-                else delete next[it.id];
             }
             return next;
         });
@@ -47,14 +47,31 @@ export default function OpnamePage() {
 
     const muatDetail = useCallback(async (id) => {
         const d = await fetchOpnameDetail(id);
-        setKotor({});
         fokusRef.current = '';
         setBuka(d);
         const awal = {};
         for (const it of d.items || []) {
             if (it.fisik != null) awal[it.id] = String(it.fisik);
         }
+        // B: pulihkan draf lokal — hanya baris yang di server masih kosong (server menang),
+        // hanya bila sesi masih HITUNG, catatan < 7 hari.
+        const kotorAwal = {};
+        if (d.status === 'HITUNG') {
+            try {
+                const mentah = localStorage.getItem(`opname-draf-${d.idSesi}`);
+                if (mentah) {
+                    const simpan = JSON.parse(mentah);
+                    const segar = simpan && simpan.t && Date.now() - Number(simpan.t) < 7 * 86400 * 1000;
+                    if (segar && simpan.d && typeof simpan.d === 'object') {
+                        for (const [rid, v] of Object.entries(simpan.d)) {
+                            if (awal[rid] == null && v !== '' && v != null) { awal[rid] = String(v); kotorAwal[rid] = true; }
+                        }
+                    }
+                }
+            } catch { /* storage diblokir: abaikan, Simpan manual tetap jalan */ }
+        }
         setDraf(awal);
+        setKotor(kotorAwal);
         setCari('');
         setKatAktif(null);
     }, []);
@@ -70,7 +87,32 @@ export default function OpnamePage() {
         muatDetail(id).catch(e => setPesan(e.message));
     }, [params, muatDetail]);
 
-    // Poll hemat 3 orang: ringkasan kecil tiap 18 dtk, detail full hanya bila
+    // B: catat ketikan belum-Simpan ke localStorage per sesi (debounce; byte kecil).
+    // Berhasil Simpan / sesi tutup = efek ini membersihkan sendiri (kotor kosong -> hapus kunci).
+    useEffect(() => {
+        if (!buka || buka.status !== 'HITUNG' || !buka.idSesi) return;
+        const kunci = `opname-draf-${buka.idSesi}`;
+        const t = setTimeout(() => {
+            try {
+                const isi = {};
+                for (const [id, v] of Object.entries(draf)) {
+                    if (kotor[id] && v !== '' && v != null) isi[id] = String(v);
+                }
+                if (Object.keys(isi).length) localStorage.setItem(kunci, JSON.stringify({ d: isi, t: Date.now() }));
+                else localStorage.removeItem(kunci);
+            } catch { /* abaikan */ }
+        }, 500);
+        return () => clearTimeout(t);
+    }, [draf, kotor, buka]);
+
+    // D: peringatan tutup tab/reload bila ada ketikan belum tersimpan.
+    useEffect(() => {
+        const jaga = (e) => { if (Object.keys(kotorRef.current || {}).length) e.preventDefault(); };
+        window.addEventListener('beforeunload', jaga);
+        return () => window.removeEventListener('beforeunload', jaga);
+    }, []);
+
+    // Poll realtime 3 orang tiap 8,5 dtk: cek ringkas ringan, detail full hanya bila
     // hitungan berubah. Lewati saat hidden. Baris sedang diketik aman via gabungDetail.
     const sedangPoll = useRef(false);
     useEffect(() => {
@@ -80,21 +122,20 @@ export default function OpnamePage() {
             if (sedangPoll.current || document.hidden) return;
             sedangPoll.current = true;
             try {
-                const daftarKini = await fetchOpname();
-                setDaftar(daftarKini);
-                const ringkas = (daftarKini || []).find(s => s.idSesi === idSesi);
+                const ringkas = await fetchOpnameRingkas(idSesi);
                 const lokal = bukaRef.current;
-                if (!ringkas || !lokal || lokal.idSesi !== idSesi) return;
+                if (!lokal || lokal.idSesi !== idSesi) return;
                 const hitungLokal = (lokal.items || []).filter(it => it.fisik != null).length;
                 const gerakLokal = (lokal.items || []).filter(it => it.fisik != null && Number(it.fisik) !== Number(it.sistem)).length;
                 if (ringkas.status !== lokal.status || ringkas.dihitung !== hitungLokal || ringkas.bergerak !== gerakLokal) {
                     gabungDetail(await fetchOpnameDetail(idSesi));
+                    try { setDaftar(await fetchOpname()); } catch { /* daftar latar: abaikan */ }
                 }
             } catch { /* senyap: tampilkan data terakhir */ } finally {
                 sedangPoll.current = false;
             }
         };
-        const t = setInterval(() => { tick(true); }, 18000);
+        const t = setInterval(() => { tick(true); }, 8500);
         const saatTerlihat = () => { if (!document.hidden) tick(true); };
         document.addEventListener('visibilitychange', saatTerlihat);
         return () => { clearInterval(t); document.removeEventListener('visibilitychange', saatTerlihat); };
@@ -153,6 +194,13 @@ export default function OpnamePage() {
         if (res) { try { await muatDetail(buka.idSesi); } catch (e) { setPesan(e.message); } }
     }
 
+    // D: cegah keluar tak sengaja saat ada ketikan belum tersimpan.
+    function bolehKeluar() {
+        const n = Object.keys(kotor).length;
+        if (!n) return true;
+        return window.confirm(`Ada ${n} hitungan belum tersimpan di perangkat ini. Tetap keluar?`);
+    }
+
     async function putus() {
         if (!buka) return;
         // Segarkan dulu agar angka confirm = rekap gabungan 3 orang terkini.
@@ -161,13 +209,13 @@ export default function OpnamePage() {
         const gerak = (kini.items || []).filter(it => it.fisik != null && it.selisih).length;
         const res = await aksi(() => putusOpname(kini.idSesi), 'Selesai.',
             `Putus opname? ${gerak} barang bergerak, stock ikut berubah.`);
-        if (res) { setBuka(null); setDraf({}); setKotor({}); }
+        if (res) { try { localStorage.removeItem(`opname-draf-${kini.idSesi}`); } catch {} setBuka(null); setDraf({}); setKotor({}); }
     }
 
     async function batal() {
-        const res = await aksi(() => batalOpname(buka.idSesi), 'Dibatalkan.',
-            'Batalkan sesi? Hitungan hilang, stock tak berubah.');
-        if (res) { setBuka(null); setDraf({}); setKotor({}); }
+        const res = await aksi(() => batalOpname(buka.idSesi), 'Dihapus.',
+            'Hapus sesi ini permanen? Hitungan dibuang, stock tak berubah.');
+        if (res) { try { localStorage.removeItem(`opname-draf-${buka.idSesi}`); } catch {} setBuka(null); setDraf({}); setKotor({}); }
     }
 
     const daftarKategori = useMemo(() => opsiKategori(buka ? buka.items : []), [buka]);
@@ -185,7 +233,7 @@ export default function OpnamePage() {
     const review = useMemo(() => {
         if (!buka) return { hitung: [], belum: 0, arsip: false, macam: 0, kiniTotal: 0, selisihTotal: 0 };
         const hitung = (buka.items || []).filter(it => it.fisik != null);
-        const arsip = buka.status === 'SELESAI' || buka.status === 'BATAL';
+        const arsip = buka.status === 'SELESAI';
         // Arsip: selisih vs snapshot awal (fisik-kini selalu 0 pasca-putus).
         const selisihTampil = (it) => arsip ? Number(it.fisik ?? 0) - Number(it.sistem ?? 0) : (it.selisih || 0);
         const kiniTotal = hitung.reduce((a, it) => a + (Number(it.kini ?? it.fisik) || 0), 0);
@@ -197,7 +245,7 @@ export default function OpnamePage() {
         <Container className='py-4 hub-lebar'>
             <div className='d-flex justify-content-between align-items-center mb-3'>
                 <h2 className='mb-0 fw-bold'>Opname</h2>
-                <Button size='sm' variant='outline-secondary' onClick={() => navigate('/inventory')}>
+                <Button size='sm' variant='outline-secondary' onClick={() => { if (bolehKeluar()) navigate('/inventory'); }}>
                     ← Inventory
                 </Button>
             </div>
@@ -218,7 +266,7 @@ export default function OpnamePage() {
                                 style={{ borderBottom: '1px solid #f1f3f5' }}>
                                 <div>
                                     <span className='fw-medium small'>{s.idSesi}</span>{' '}
-                                    <Badge bg={s.status === 'SELESAI' ? 'success' : s.status === 'BATAL' ? 'secondary' : 'warning'}>
+                                    <Badge bg={s.status === 'SELESAI' ? 'success' : 'warning'}>
                                         {s.status}
                                     </Badge>{' '}
                                     {s.total <= 3 && <Badge bg='info'>Mini</Badge>}
@@ -295,7 +343,7 @@ export default function OpnamePage() {
                 </Card>
             )}
 
-            {buka && (buka.status === 'REVIEW' || buka.status === 'SELESAI' || buka.status === 'BATAL') && (
+            {buka && (buka.status === 'REVIEW' || buka.status === 'SELESAI') && (
                 <Card className='shadow-sm border-0 mb-3' style={{ borderRadius: '12px' }}>
                     <Card.Body>
                         <div className='d-flex justify-content-between align-items-center mb-2'>
@@ -314,7 +362,7 @@ export default function OpnamePage() {
                                 </span>
                             )}
                             {buka.status !== 'REVIEW' && (
-                                <Button size='sm' variant='outline-secondary' onClick={() => setBuka(null)}>
+                                <Button size='sm' variant='outline-secondary' onClick={() => { if (bolehKeluar()) setBuka(null); }}>
                                     Daftar sesi
                                 </Button>
                             )}

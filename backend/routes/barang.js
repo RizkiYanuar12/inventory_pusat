@@ -230,7 +230,8 @@ router.put('/api/barang/:id', wajibGudang, async (req, res) => {
   }
 });
 
-// Hapus barang + transaksi miliknya; tolak bila dipakai di pesanan/pengiriman
+// Hapus barang; riwayat transaksi miliknya DIPERTAHANKAN (FK SET NULL di DB).
+// Tolak bila dipakai di pesanan/pengiriman.
 router.delete('/api/barang/:id', wajibGudang, async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
@@ -251,11 +252,9 @@ router.delete('/api/barang/:id', wajibGudang, async (req, res) => {
     if (pakai.length) {
       return res.status(409).json({ sukses: false, pesan: `${ada.data.nama_barang} dipakai di ${pakai.join('; ')}. Tidak bisa dihapus.` });
     }
-    const ht = await sb.from('transaksi').delete().eq('id_barang', id);
-    if (ht.error) throw new Error(ht.error.message);
     const hb = await sb.from('barang_inventory').delete().eq('id_barang', id);
     if (hb.error) throw new Error(hb.error.message);
-    res.json({ sukses: true, pesan: `Barang ${ada.data.nama_barang} (${id}) dihapus.` });
+    res.json({ sukses: true, pesan: `Barang ${ada.data.nama_barang} (${id}) dihapus. Riwayat transaksinya tetap tersimpan.` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ sukses: false, pesan: 'Gagal menghapus: ' + err.message });

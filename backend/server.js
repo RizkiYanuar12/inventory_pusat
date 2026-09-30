@@ -1,18 +1,13 @@
 // Server baru hasil pecah (opsi A): setup + mount routes. Perilaku identik server.js lama.
 // Dijalankan via root forwarder (`node server.js`) atau langsung (`node backend/server.js`).
 const path = require('path');
-// Staging lokal: USE_STAGING=1 -> baca ../.env.staging (DB latihan; prod aman).
-// File hilang -> bunuh proses sekalian (jangan jatuh diam-diam ke .env prod).
-if (process.env.USE_STAGING) {
-  const f = path.join(__dirname, '../.env.staging');
-  if (!require('fs').existsSync(f)) throw new Error('.env.staging tak ada — batal agar tak nyasar ke DB prod.');
-  require('dotenv').config({ path: f });
-  console.log('ENV: staging (.env.staging)');
-} else {
-  require('dotenv').config({ path: path.join(__dirname, '../.env') });
-  console.log('ENV: prod (.env)');
-}
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config();
+// Penanda DB aktif (baca hostname saja, tanpa kunci): pastikan staging/prod sesuai isi .env.
+try {
+  const u = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+  console.log(`DB: ${u ? new URL(u).hostname : '(belum dikonfigurasi)'}`);
+} catch { console.log('DB: (URL tak valid)'); }
 const express = require('express');
 const cors = require('cors');
 const app = express();

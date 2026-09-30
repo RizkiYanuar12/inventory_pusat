@@ -57,6 +57,11 @@ export default function TransaksiTable({ items }) {
                                 <div>
                                     <span className='d-block text-muted small mb-1'>
                                         {item.kategori}
+                                        {item.idBarang == null && (
+                                            <span className='ms-1' style={{ background: '#fefefe', color: '#ff0707', borderRadius: 6, padding: '1px 8px'}}>
+                                                barang sudah dihapus dari gudang
+                                            </span>
+                                        )}
                                     </span>
                                     <span className='fw-bold fs-5'>
                                         {item.nama} 
