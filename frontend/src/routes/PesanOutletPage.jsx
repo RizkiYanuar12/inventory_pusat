@@ -35,7 +35,7 @@ export default function PesanOutletPage() {
     const [tab, setTab] = useState('pesan');
     const [filter, setFilter] = useState('Aktif');
     const [search, setSearch] = useState('');
-    const [keranjang, setKeranjang] = useState({}); // {gi: qty}, gi = index di data.katalog (ID bisa kembar '-')
+    const [keranjang, setKeranjang] = useState({}); // {id_barang: qty} — key id kebal reorder katalog (gi index dicabut, bug PSN-20261001-004)
     const [nama, setNama] = useState('');
     const [saving, setSaving] = useState(false);
     const [modal, setModal] = useState({ show: false, sukses: false, pesan: '' });
@@ -142,7 +142,6 @@ export default function PesanOutletPage() {
     }
 
     // Poll hemat: segarkan riwayat/surat tiap 30 dtk hanya saat tab itu aktif;
-    // diam saat tab disembunyikan / sedang submit; fetch sekali saat kembali terlihat.
     useEffect(() => {
         if (tab !== 'riwayat' && tab !== 'surat') return;
         const t = setInterval(() => {
@@ -158,10 +157,10 @@ export default function PesanOutletPage() {
     // Kelompok kategori: 1 layar = 1 kategori, pindah via tab menyamping (ala hub gudang).
     const kelompok = useMemo(() => {
         const map = new Map();
-        ((data?.katalog) || []).forEach((b, gi) => {
+        ((data?.katalog) || []).forEach((b) => {
             const kat = String(b.kategori || '').trim() || 'Lainnya';
             if (!map.has(kat)) map.set(kat, []);
-            map.get(kat).push({ b, gi });
+            map.get(kat).push({ b });
         });
         return [...map.entries()]
             .sort((a, b) => a[0].localeCompare(b[0], 'id'))
@@ -173,7 +172,7 @@ export default function PesanOutletPage() {
         const q = search.trim().toLowerCase();
         if (!q) return [];
         return ((data?.katalog) || [])
-            .map((b, gi) => ({ b, gi }))
+            .map((b) => ({ b }))
             .filter(({ b }) => (`${b.nama} ${b.varian} ${b.id} ${b.kategori || ''}`.toLowerCase().includes(q)));
     }, [data, search]);
 
@@ -182,25 +181,28 @@ export default function PesanOutletPage() {
         ? hasilCari
         : (kelompok.find(k => k.nama === katTampil)?.items || []);
 
+    // Peta id -> barang untuk render keranjang (kebal urutan array katalog).
+    const petaKatalog = useMemo(() => new Map(((data?.katalog) || []).map(b => [String(b.id), b])), [data]);
+
     const isiKeranjang = useMemo(() =>
         Object.entries(keranjang)
             .filter(([, q]) => Number(q) > 0)
-            .map(([gi, qty]) => ({ gi: Number(gi), id: (data?.katalog || [])[Number(gi)]?.id, qty: Number(qty) })),
-        [keranjang, data]);
+            .map(([id, qty]) => ({ id, qty: Number(qty) })),
+        [keranjang]);
     const totalPcs = isiKeranjang.reduce((a, it) => a + it.qty, 0);
 
-    function setQty(gi, qty) {
-        setKeranjang(prev => ({ ...prev, [gi]: qty }));
+    function setQty(id, qty) {
+        setKeranjang(prev => ({ ...prev, [id]: qty }));
     }
-    function tambah(gi) {
-        setKeranjang(prev => ({ ...prev, [gi]: Number(prev[gi] || 0) + 1 }));
+    function tambah(id) {
+        setKeranjang(prev => ({ ...prev, [id]: Number(prev[id] || 0) + 1 }));
     }
-    function kurang(gi) {
+    function kurang(id) {
         setKeranjang(prev => {
             const next = { ...prev };
-            const v = Number(prev[gi] || 0) - 1;
-            if (v <= 0) delete next[gi];
-            else next[gi] = v;
+            const v = Number(prev[id] || 0) - 1;
+            if (v <= 0) delete next[id];
+            else next[id] = v;
             return next;
         });
     }
@@ -208,7 +210,7 @@ export default function PesanOutletPage() {
 
     function jmlTerisi(items) {
         let n = 0;
-        for (const { gi } of items) if (Number(keranjang[gi] || 0) > 0) n++;
+        for (const { b } of items) if (Number(keranjang[String(b.id)] || 0) > 0) n++;
         return n;
     }
 
@@ -416,12 +418,19 @@ export default function PesanOutletPage() {
                 <div>
                     {!data.bolehPesan ? (
                         <div className='outlet-tutup'>
-                                <p className='small mb-1'>
-                                    <strong>Hanya menerima pesanan di bawah jam 15.00 WIB.</strong>
-                                </p>
-                                <p className='text-muted small mb-3'>
-                                    Loket buka lagi besok pagi. Pantau pesananmu di Tab Riwayat.
-                                </p>
+                                {(() => {
+                                    // ponytail: pesan dibedakan Minggu vs cutoff; hitung hari-Jakarta murni frontend
+                                    let minggu = false;
+                                    try { minggu = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jakarta', weekday: 'short' }).format(new Date()) === 'Sun'; } catch { minggu = new Date().getDay() === 0; }
+                                    return (<>
+                                        <p className='small mb-1'>
+                                            <strong>{minggu ? 'Hari Minggu libur — loket buka Senin–Sabtu di bawah jam 15.00 WIB.' : 'Hanya menerima pesanan di bawah jam 15.00 WIB.'}</strong>
+                                        </p>
+                                        <p className='text-muted small mb-3'>
+                                            {minggu ? 'Buka Senin pagi. Pantau pesananmu di Tab Riwayat.' : 'Loket buka lagi pagi. Pantau pesananmu di Tab Riwayat.'}
+                                        </p>
+                                    </>);
+                                })()}
                                 <Button size='sm' variant='outline-primary' onClick={() => { setHalRiwayat(1); setTab('riwayat'); }}>
                                     Lihat Riwayat
                                 </Button>
@@ -435,8 +444,8 @@ export default function PesanOutletPage() {
                                         <div className='text-muted py-1' style={{ fontSize: '11px' }}>
                                             {sedangCari ? `Hasil cari (${daftarTampil.length})` : `${katTampil} (${daftarTampil.length})`}
                                         </div>
-                                        {daftarTampil.map(({ b, gi }) => (
-                                            <div key={`${b.id}#${gi}`} className='outlet-item'>
+                                        {daftarTampil.map(({ b }) => (
+                                            <div key={String(b.id)} className='outlet-item'>
                                                 <div className='flex-grow-1' style={{ minWidth: 0 }}>
                                                     <div className='nm'>{b.nama}</div>
                                                     <div className='mt'>
@@ -445,14 +454,14 @@ export default function PesanOutletPage() {
                                                     </div>
                                                 </div>
                                                 <div className='stepper'>
-                                                    <button onClick={() => kurang(gi)} aria-label={`Kurangi ${b.nama}`}>−</button>
+                                                    <button onClick={() => kurang(String(b.id))} aria-label={`Kurangi ${b.nama}`}>−</button>
                                                     <Form.Control
                                                         type='number' inputMode='numeric' min='0'
                                                         placeholder='0' aria-label={`Jumlah ${b.nama}`}
-                                                        value={keranjang[gi] ?? ''}
-                                                        onChange={e => setQty(gi, e.target.value)}
+                                                        value={keranjang[String(b.id)] ?? ''}
+                                                        onChange={e => setQty(String(b.id), e.target.value)}
                                                     />
-                                                    <button className='tambah' onClick={() => tambah(gi)} aria-label={`Tambah ${b.nama}`}>+</button>
+                                                    <button className='tambah' onClick={() => tambah(String(b.id))} aria-label={`Tambah ${b.nama}`}>+</button>
                                                 </div>
                                             </div>
                                         ))}
@@ -480,18 +489,18 @@ export default function PesanOutletPage() {
                     <Card className='shadow-sm border-0 mb-2'>
                         <Card.Body className='py-1 px-3'>
                             {isiKeranjang.map(it => {
-                                const b = (data.katalog || [])[it.gi];
+                                const b = petaKatalog.get(String(it.id));
                                 return (
-                                    <div key={`${it.id}#${it.gi}`} className='outlet-item'>
+                                    <div key={String(it.id)} className='outlet-item'>
                                         <div className='flex-grow-1' style={{ minWidth: 0 }}>
                                             <div className='nm'>{b?.nama || it.id}</div>
                                             <div className='mt'>{[b?.varian, b?.satuan].filter(Boolean).join(' • ')}</div>
                                         </div>
                                         <div className='stepper'>
-                                            <button onClick={() => kurang(it.gi)} aria-label={`Kurangi ${b?.nama}`}>−</button>
+                                            <button onClick={() => kurang(String(it.id))} aria-label={`Kurangi ${b?.nama}`}>−</button>
                                             <strong style={{ minWidth: 28, textAlign: 'center', fontSize: '17px' }}>{it.qty}</strong>
-                                            <button className='tambah' onClick={() => tambah(it.gi)} aria-label={`Tambah ${b?.nama}`}>+</button>
-                                            <button onClick={() => setQty(it.gi, '')} aria-label={`Hapus ${b?.nama}`}>×</button>
+                                            <button className='tambah' onClick={() => tambah(String(it.id))} aria-label={`Tambah ${b?.nama}`}>+</button>
+                                            <button onClick={() => setQty(String(it.id), '')} aria-label={`Hapus ${b?.nama}`}>×</button>
                                         </div>
                                     </div>
                                 );

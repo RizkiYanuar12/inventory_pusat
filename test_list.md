@@ -31,8 +31,8 @@
 - [x] **U5.** Tanpa nama / keranjang kosong → popup merah, tanpa baris baru.
 
 ### Loket 15:00 + gabung (ganti blokir 1-aktif 2026-09-14)
-- [x] **U6.** Loket buka (<15:00 WIB tiap hari): Tab Pesan Baru selalu tampil, pesan berkali-kali bisa; pesan kedua sehati + masih BARU → gabung ID sama (`digabung: true`, qty se-ID dijumlah, lonceng DIGABUNG); beda hari / sudah diputus (DISETUJUI/DITOLAK/DIKIRIM) → ID baru.
-- [x] **U6b.** Loket tutup (≥15:00): Tab Pesan Baru diganti kartu info `Hanya menerima pesanan di bawah jam 15.00 WIB` (bukan form); POST langsung → 403 pesan sama.
+- [x] **U6.** Loket buka (Senin–Sabtu <15:00 WIB; Minggu libur total): Tab Pesan Baru selalu tampil saat buka, pesan berkali-kali bisa; pesan kedua sehati + masih BARU → gabung ID sama (`digabung: true`, qty se-ID dijumlah, lonceng DIGABUNG); beda hari / sudah diputus (DISETUJUI/DITOLAK/DIKIRIM) → ID baru.
+- [x] **U6b.** Loket tutup (Senin–Sabtu ≥15:00): Tab Pesan Baru diganti kartu info `Hanya menerima pesanan di bawah jam 15.00 WIB` (bukan form); POST langsung → 403 pesan sama. Minggu (jam berapa pun): kartu `Hari Minggu libur — loket buka Senin–Sabtu di bawah jam 15.00 WIB` + POST → 403 pesan itu.
 - [x] **U6c.** Hub gudang tanpa Tab Buat (3 tab: Daftar/Lacak/Lainnya); outlet tanpa tombol batal (SOP: hubungi gudang via WA/telpon → gudang Tolak semua + keterangan → DITOLAK → boleh pesan ulang).
 - [x] **U7.** Toko lain tetap bisa pesan (isolasi per token; riwayat hanya milik token).
 
@@ -104,7 +104,7 @@
 - [ Sukses ] **E4.** Popup `Pesanan PSN-... tercatat (BARU)...`; Riwayat badge `(1)`; log `PESANAN BARU` + ringkasan + batch/kirim + lonceng ≤30 dtk.
 - [ Sukses ] **E5.** Merah `Nama pemesan wajib diisi.` / `Keranjang masih kosong.`; jumlah baris tetap.
 - [ Sukses ] **E6.** Pesan kedua gabung ID sama + respons `digabung: true` + lonceng DIGABUNG; ID baru bila beda hari/sudah diputus.
-- [ Sukses ] **E6b.** Kartu tutup + POST 403 pesan persis `Hanya menerima pesanan di bawah jam 15.00 WIB`.
+- [ Sukses ] **E6b.** Kartu tutup + POST 403 pesan persis (`Hanya menerima pesanan di bawah jam 15.00 WIB` Senin–Sabtu; `Hari Minggu libur — loket buka Senin–Sabtu di bawah jam 15.00 WIB` di Minggu).
 - [ Sukses ] **E6c.** Hub tanpa Tab Buat; outlet tanpa tombol batal.
 - [ ] **E7.** Order toko B sukses `(BARU)` (isolasi token).
 - [ Sukses ] **E8.** Angka = hitungan BARU per tab alur; FIFO antrean, arsip terbaru; chip `✓/✕` + ambang 4.
@@ -145,3 +145,49 @@
 - [ ] **E32.** `isi_per_gudang` tersimpan di master (jalur pesanan); form manual tetap eceran; NULL = terkunci-SO (jalur pesanan tanpa pasangan → merah `Lengkapi Isi...`).
 - [ ] **E33.** Metadata berubah + list refresh; merah duplikat / satuan-tanpa-ketik; ID/stock tetap.
 - [ ] **E34.** Modal detail + `Ya, hapus` → hilang total; 409 bila dipakai order; Batalkan → utuh.
+
+-----
+
+## Runbook UAT berurutan (2026-10-01; centang dari atas ke bawah)
+
+> Siapkan: 1 browser gudang + 2 incognito outlet, jam di bawah 15:00 WIB untuk sesi pesan.
+> Lapor gagal: **nomor + terjadi vs expected + pesan popup + status DB.**
+
+### 0. Persiapan (U1, U24)
+- [ Sukses ] **R0.** Buka `/` → redirect `/homepage` → lempar `/gudang-masuk` (belum login). BottomNav 5 item hanya di halaman gudang.
+- [ ] **R0b.** Catat jumlah `barang/transaksi/pesanan/pengiriman` awal (pembanding U24).
+
+### 1. Login gudang (U38, U39)
+- [ ] **R1.** `/inventory` tanpa sesi → lempar login; salah → 401 generik; 10x/mnt → 429; benar → `/homepage`; Keluar (confirm) → login; ganti password (2x, min 4) → lama mati.
+- [ ] **R1b.** Tanpa sesi: `GET /api/barang`, `/api/pengiriman`, `POST keputusan` → 401; `/terima/xxx` → 404.
+
+### 2. Login outlet (U43–U45)
+- [ ] **R2.** Link pastry tanpa sesi → form username+password (bukan katalog); salah → 401; 10x/mnt → 429; benar → 24 jam; tutup tab → login ulang.
+- [ ] **R2b.** Klaim pertama 1x + auto-masuk, ulang → 409; teks lupa-password tampil → reset Kelola Akun berlaku; ikon Sandi ganti-sendiri berlaku.
+
+### 3. Pesan + regresi PSN-20261001-004 (U2–U7)
+- [ ] **R3.** Header nota + jadwal + katalog tanpa stock; kategori + search jalan; qty ketik langsung + badge 🛒.
+- [ ] **R3b (regresi).** Isi 3+ item → Refresh → keranjang tetap barang sama → submit → nama+qty tercatat sama persis (tidak tertukar). Ulangi 2x.
+- [ ] **R3c.** Tanpa nama / kosong → merah tanpa baris baru; pesan kedua sehati → gabung ID sama; toko lain isolasi token; Senin–Sabtu ≥15:00 → kartu tutup + 403 pesan 15.00; Minggu → kartu + 403 pesan libur.
+
+### 4. Putus gudang (U8–U10, U41)
+- [ ] **R4.** Tab alur + badge + search + FIFO; putus 1 → pindah tab; tolak tanpa ket → merah; tolak semua → DITOLAK tanpa kirim/stock.
+- [ ] **R4b.** Campuran → DISETUJUI SEBAGIAN + kiriman otomatis + stock −1x; putus ulang → 409; parsial 10→5 + ket → ringkasan `x10 → kirim 5 (kurang 5: ket)`; qty invalid → 400.
+
+### 5. Kirim + terima (U11–U19)
+- [ ] **R5.** Ceklis per line + foto → DIKIRIM (tanpa link/WA/Salin Link); jejak + foto di Lacak dan Tab Surat Jalan outlet.
+- [ ] **R5b.** Validasi terima merah bila tak lengkap; semua sesuai → DITERIMA terkunci; 1 beda → DITERIMA SEBAGIAN otomatis.
+- [ ] **R5c.** Batal pre-lapor + alasan → status asal + stock utuh; tanpa alasan → merah; pasca-terima → 409; mirror Tandai/terima benar; tanpa dobel stock.
+
+### 6. Akun, lacak, cetak, lonceng (U20, U21, U40, U42, U35, U36)
+- [ ] **R6.** Username 1x terkunci; reset berlaku; token permanen; Lacak 20 + Muat lagi + filter/expand + selisih + chip `id_kirim`.
+- [ ] **R6b.** Print DIKIRIM: judul, angka = Lacak, grandTotal Σ kirim, DD/MM/YYYY, landscape 1 lembar, checklist 3 kosong, TOLAK coret + footnote; SIAP KIRIM tanpa tombol + 409.
+- [ ] **R6c.** Lonceng ≤30 dtk + bunyi + getar; baca → nol; bisu → badge saja; 360px 1 kolom; kategori uppercase.
+
+### 7. Input, history, vendor, opname (U22–U23, U25–U34, U46–U50)
+- [ ] **R7.** Input eceran-saja + totalBayar wajib + ID auto `MNL-…`; `/tambah-barang` + `/scan` mati; History + Aset + CSV; poll ringan kecil; pagination 5/halaman.
+- [ ] **R7b.** Duplikat 409 + ID; `%`/`_` aman; spasi normalisasi; non-eceran API 400; `isi_per_gudang` untuk pesanan; edit/hapus + guard 409.
+- [ ] **R7c.** Vendor CRUD + 401; opname mulai → hitung → review → putus (stock = selisih) / batal (tanpa tulis).
+
+### 8. Bersih-bersih (U24)
+- [ ] **R8.** Baris uji selesai/dihapus → jumlah kembali awal R0b.

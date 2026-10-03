@@ -1,5 +1,5 @@
 // Jadwal Slot pengiriman (PRD seksi 7): Senin & Kamis, cutoff 15:00 WIB
-const SLOT_DAYS = [1, 4]; // Senin=1, Kamis=4
+const SLOT_DAYS = [1, 4]; // Senin=1, Kamis=4 (getUTCDay/dayNum: Minggu=0)
 const SLOT_CUTOFF_JAM = 15;
 const NAMA_HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -67,15 +67,18 @@ function formatWaktuBukti(date = new Date()) {
   });
 }
 
-// Gate loket pesan (2026-09-14, ganti P1b 1-aktif): buka tiap hari di bawah jam 15:00 WIB.
+// Gate loket pesan: Senin–Sabtu di bawah jam cutoff; Minggu libur total.
 function pesanDibuka(waktu = new Date()) {
-  return jakartaParts(new Date(waktu)).jam < SLOT_CUTOFF_JAM;
+  const { dayNum, jam } = jakartaParts(new Date(waktu));
+  if (dayNum === 0) return false; // Minggu libur
+  return jam < SLOT_CUTOFF_JAM;
 }
 const PESAN_TUTUP = 'Hanya menerima pesanan di bawah jam 15.00 WIB.';
+const PESAN_TUTUP_MINGGU = 'Hari Minggu libur — loket buka Senin–Sabtu di bawah jam 15.00 WIB.';
 
 module.exports = {
   SLOT_DAYS, SLOT_CUTOFF_JAM, NAMA_HARI, NAMA_BULAN,
   jakartaParts, anchorDariYmd, geserHari, slotBerikutnya,
   hitungSlot, formatTanggalSlot, formatWaktuBukti,
-  pesanDibuka, PESAN_TUTUP,
+  pesanDibuka, PESAN_TUTUP, PESAN_TUTUP_MINGGU,
 };

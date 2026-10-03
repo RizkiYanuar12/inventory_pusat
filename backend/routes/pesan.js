@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const router = express.Router();
 const { sb, nowIso } = require('../../db');
 const { wajibGudang, wajibOutlet, simpanSesi, UMUR_SESI_OUTLET_MS, namaCookieOutlet, hashKataSandi, cekKataSandi, kenaRate, atributSecure } = require('../lib/auth');
-const { jakartaParts, hitungSlot, formatWaktuBukti, pesanDibuka, PESAN_TUTUP } = require('../lib/waktu');
+const { jakartaParts, hitungSlot, formatWaktuBukti, pesanDibuka, PESAN_TUTUP, PESAN_TUTUP_MINGGU } = require('../lib/waktu');
 const { buatRingkasan, tambahRiwayat, buatRingkasanKirim, buatAlasan } = require('../lib/ringkas');
 const { kanonikSatuan } = require('../lib/konversi');
 const {
@@ -36,7 +36,7 @@ router.get('/api/pesan/:token', wajibOutlet, async (req, res) => {
     const ringan = String(req.query.ringan || '') === '1';
     let katalog = [];
     if (!ringan) {
-      const br = await sb.from('barang_inventory').select('*').order('dibuat_pada', { ascending: true });
+      const br = await sb.from('barang_inventory').select('*').order('dibuat_pada', { ascending: true }).order('id_barang', { ascending: true });
       if (br.error) throw new Error(br.error.message);
       katalog = br.data.map(b => ({
         id: b.id_barang,
@@ -96,7 +96,8 @@ router.post('/api/pesan/:token', wajibOutlet, async (req, res) => {
     const outlet = await cariOutletByToken(req.params.token);
     if (!outlet) return res.status(404).json({ sukses: false, pesan: 'Link tidak valid.' });
     if (!pesanDibuka(new Date())) {
-      return res.status(403).json({ sukses: false, pesan: PESAN_TUTUP });
+      const hariMinggu = jakartaParts(new Date()).dayNum === 0;
+      return res.status(403).json({ sukses: false, pesan: hariMinggu ? PESAN_TUTUP_MINGGU : PESAN_TUTUP });
     }
 
     const { namaPemesan, items } = req.body;

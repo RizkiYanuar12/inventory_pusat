@@ -37,7 +37,7 @@ async function vendorKeCatat(body) {
 
 router.get("/api/barang", wajibGudang, async (req, res) => {
   try{
-    const r = await sb.from('barang_inventory').select('*').order('dibuat_pada', { ascending: true });
+    const r = await sb.from('barang_inventory').select('*').order('dibuat_pada', { ascending: true }).order('id_barang', { ascending: true });
     if (r.error) throw new Error(r.error.message);
     const data = r.data.map(row => ({
       id: row.id_barang,
