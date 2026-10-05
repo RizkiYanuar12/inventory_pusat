@@ -18,6 +18,8 @@ const rpAvg = (n) => n == null ? '-' : Number(n).toLocaleString('id-ID', { maxim
 
 export default function FormBarangSudahAda({ barang, onSubmit }) {
     const satuanStock = barang.satuanEceran || 'pcs';
+    // ponytail: BASAH = titipan vendor full tanpa stock — Masuk hanya update harga
+    const basah = String(barang.kategori || '').trim().toLowerCase() === 'basah';
     const [jumlah, setJumlah] = useState(1)
     const [totalBayar, setTotalBayar] = useState('')
     const [vendorId, setVendorId] = useState('')
@@ -35,8 +37,10 @@ export default function FormBarangSudahAda({ barang, onSubmit }) {
 
     const avgLama = barang.hargaBarang != null ? Number(barang.hargaBarang) : null;
     const bayar = parseRibu(totalBayar);
-    const avgBaru = (jumlahKonversi != null && jumlahKonversi > 0 && bayar > 0)
-        ? hitungAvg(avgLama, barang.stock, bayar, jumlahKonversi)
+    // ponytail: BASAH tanpa jumlah — avg dari harga saja: (avgLama + hargaInput) / 2
+    const avgBaru = bayar > 0
+        ? (basah ? (avgLama != null ? (avgLama + bayar) / 2 : bayar)
+            : (jumlahKonversi > 0 ? hitungAvg(avgLama, barang.stock, bayar, jumlahKonversi) : null))
         : null;
 
     const stepJumlah = (arah) => {
@@ -54,16 +58,21 @@ export default function FormBarangSudahAda({ barang, onSubmit }) {
                         <span className="gd-input-id">{barang.id}</span>
                     </div>
                     <div className="gd-input-nama">{barang.nama}{barang.varian && <span className="gd-input-varian"> — {barang.varian}</span>}</div>
+                    {basah ? (
+                        <div className="text-muted small mt-1">Titipan vendor — tanpa stock, Masuk hanya update harga.</div>
+                    ) : (
                     <div className="gd-input-stockrow">
                         <span className="gd-input-stocklabel">Stock</span>
                         <span className="gd-input-stock">{barang.stock} <small>{satuanStock}</small></span>
                     </div>
+                    )}
                     <div className="gd-input-avg">
                         {avgLama != null ? `Avg Rp ${rpAvg(avgLama)}` : 'Avg pertama (belum ada harga)'}
                     </div>
                 </div>
 
-                {/* Zona 2: stepper jumlah */}
+                {/* Zona 2: stepper jumlah (BASAH tanpa jumlah — harga saja) */}
+                {basah ? null : (
                 <div className="gd-input-zona">
                     <Form.Label className="gd-input-label">Jumlah ({satuanStock})</Form.Label>
                     <div className="gd-input-stepper">
@@ -85,11 +94,12 @@ export default function FormBarangSudahAda({ barang, onSubmit }) {
                         </Button>
                     </div>
                 </div>
+                )}
 
                 {/* Zona 3: bayar + vendor */}
                 <div className="gd-input-zona">
                     <Form.Label className="gd-input-label">
-                        Total bayar (Rp) * <span className="fst-italic">— wajib tiap Barang Masuk</span>
+                        {basah ? 'Harga baru (Rp) *' : (<>Total bayar (Rp) * <span className="fst-italic">— wajib tiap Barang Masuk</span></>)}
                     </Form.Label>
                     <Form.Control
                         type="text"
@@ -100,7 +110,9 @@ export default function FormBarangSudahAda({ barang, onSubmit }) {
                     />
                     {avgBaru != null && (
                         <p className="gd-input-avgbaru">
-                            Avg baru → Rp {rpAvg(avgBaru)} (dari {avgLama != null ? `Rp ${rpAvg(avgLama)}` : 'avg pertama'})
+                            {basah
+                                ? <>Harga baru → Rp {rpAvg(avgBaru)} (avg dari {avgLama != null ? `Rp ${rpAvg(avgLama)}` : 'harga pertama'})</>
+                                : <>Avg baru → Rp {rpAvg(avgBaru)} (dari {avgLama != null ? `Rp ${rpAvg(avgLama)}` : 'avg pertama'})</>}
                         </p>
                     )}
                     <Form.Label className="gd-input-label mt-3">
@@ -119,12 +131,13 @@ export default function FormBarangSudahAda({ barang, onSubmit }) {
                 <div className="gd-input-cap">
                     <Button
                         className="gd-input-capbtn gd-input-masuk"
-                        disabled={!(jumlahKonversi > 0)}
-                        onClick={() => onSubmit('Masuk', jumlahKonversi, satuanStock, parseRibu(totalBayar), vendorId ? Number(vendorId) : undefined)}
+                        disabled={basah ? !(bayar > 0) : !(jumlahKonversi > 0)}
+                        onClick={() => onSubmit('Masuk', basah ? 1 : jumlahKonversi, satuanStock, parseRibu(totalBayar), vendorId ? Number(vendorId) : undefined)}
                     >
-                        <span className="gd-input-captitle"><ArrowDownCircle size={18} /> Barang Masuk</span>
-                        <span className="gd-input-capsub">jadi {stockJadiMasuk} {satuanStock}</span>
+                        <span className="gd-input-captitle"><ArrowDownCircle size={18} /> {basah ? 'Update Harga' : 'Barang Masuk'}</span>
+                        <span className="gd-input-capsub">{basah ? (avgBaru != null ? `harga baru Rp ${rpAvg(avgBaru)}` : 'isi harga baru') : `jadi ${stockJadiMasuk} ${satuanStock}`}</span>
                     </Button>
+                    {basah ? null : (
                     <Button
                         className="gd-input-capbtn gd-input-keluar"
                         disabled={keluarTidakValid}
@@ -135,6 +148,7 @@ export default function FormBarangSudahAda({ barang, onSubmit }) {
                             {keluarTidakValid ? 'stock tidak cukup' : `jadi ${stockJadiKeluar} ${satuanStock}`}
                         </span>
                     </Button>
+                    )}
                 </div>
             </Card.Body>
         </Card>

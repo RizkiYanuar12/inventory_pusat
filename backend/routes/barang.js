@@ -130,13 +130,14 @@ router.post('/api/tambahBarangBaru', wajibGudang, async (req, res) => {
     }
 
     const kategoriSimpan = String(kategori || '').trim().toUpperCase();
+    const basahBaru = kategoriSimpan === 'BASAH';
     const ins = await sb.from('barang_inventory').insert({
       id_barang: idPakai,
       nama_barang: namaBersih,
       merk: varian || '',
       kategori: kategoriSimpan,
-      total: Number(jumlah) || 0,
-      minimum_stock: Number(restock) || 5,
+      total: basahBaru ? 0 : (Number(jumlah) || 0),
+      minimum_stock: basahBaru ? 0 : (Number(restock) || 5),
       satuan,
       satuan_gudang: kanonikSatuan(satuanGudang) || '',
       isi_per_gudang: isiPerGudang != null && isiPerGudang !== '' ? Number(isiPerGudang) : null,
@@ -147,11 +148,13 @@ router.post('/api/tambahBarangBaru', wajibGudang, async (req, res) => {
     if (ins.error) throw new Error(ins.error.message);
 
     const vCatat = await vendorKeCatat(req.body);
-    await catatTransaksi(idPakai, namaBersih, varian, kategoriSimpan, 'Masuk', Number(jumlah) || 0, satuan,
-      Number(jumlah) > 0 && Number(totalBayar) > 0 ? Number(totalBayar) / Number(jumlah) : null,
-      null, vCatat.keterangan, vCatat.idVendor);
+    if (!basahBaru) {
+      await catatTransaksi(idPakai, namaBersih, varian, kategoriSimpan, 'Masuk', Number(jumlah) || 0, satuan,
+        Number(jumlah) > 0 && Number(totalBayar) > 0 ? Number(totalBayar) / Number(jumlah) : null,
+        null, vCatat.keterangan, vCatat.idVendor);
+    }
 
-    res.json({ sukses: true, pesan: `Barang baru ${namaBersih} tersimpan ke database. Stock awal: ${Number(jumlah) || 0} ${satuan}` });
+    res.json({ sukses: true, pesan: basahBaru ? `Barang baru ${namaBersih} tersimpan (titipan vendor, tanpa stock).` : `Barang baru ${namaBersih} tersimpan ke database. Stock awal: ${Number(jumlah) || 0} ${satuan}` });
   } catch (err) {
     console.error(err);
     res.status(err.status || 500).json({ sukses: false, pesan: (err.status ? '' : 'Gagal menyimpan: ') + err.message });
@@ -186,11 +189,14 @@ router.put('/api/barang/:id', wajibGudang, async (req, res) => {
     if (varian !== undefined) patch.merk = String(varian || '').trim();
     if (kategori !== undefined) patch.kategori = String(kategori || '').trim().toUpperCase();
     if (keterangan !== undefined) patch.keterangan = String(keterangan || '');
-    if (restock !== undefined) {
+    // ponytail: BASAH = titipan vendor — Edit kartu tak boleh ubah stock (stock via Input/Opname saja)
+    const katAkhir = patch.kategori !== undefined ? patch.kategori : String(ada.data.kategori || '').trim().toUpperCase();
+    const basah = katAkhir === 'BASAH';
+    if (restock !== undefined && !basah) {
       if (!(Number(restock) >= 0)) return res.status(400).json({ sukses: false, pesan: 'Batas restock harus angka >= 0.' });
       patch.minimum_stock = Number(restock);
     }
-    if (total !== undefined) {
+    if (total !== undefined && !basah) {
       if (!(Number(total) >= 0)) return res.status(400).json({ sukses: false, pesan: 'Stock harus angka >= 0.' });
       patch.total = Number(total);
     }
@@ -287,6 +293,26 @@ router.post('/api/prosesTransaksi', wajibGudang, async (req, res) => {
     }
 
     const jmlh = Number(jumlah);
+
+    // ponytail: BASAH = titipan vendor full tanpa stock — Masuk hanya update harga (avg dari harga saja)
+    if (String(row.kategori || '').trim().toUpperCase() === 'BASAH') {
+      if (jenis !== 'Masuk') {
+        return res.json({ sukses: false, pesan: `${row.nama_barang} titipan vendor — tanpa stock, tanpa Barang Keluar.` });
+      }
+      const bayarV = totalBayar != null && totalBayar !== '' ? Number(totalBayar) : null;
+      if (!(bayarV > 0)) {
+        return res.json({ sukses: false, pesan: `Isi Harga baru (Rp) untuk ${row.nama_barang}.` });
+      }
+      const hargaInput = bayarV / (jmlh > 0 ? jmlh : 1); // frontend BASAH selalu kirim 1 = harga langsung
+      const avgLamaV = row.harga_barang != null ? Number(row.harga_barang) : null;
+      const hargaBaru = avgLamaV != null ? (avgLamaV + hargaInput) / 2 : hargaInput;
+      const upV = await sb.from('barang_inventory').update({ total: 0, harga_barang: hargaBaru }).eq('id_barang', row.id_barang).select('id_barang');
+      if (upV.error) throw new Error(upV.error.message);
+      await catatTransaksi(row.id_barang, row.nama_barang, row.merk, row.kategori,
+        'Masuk', 1, satuanEceran, hargaInput, null,
+        vCatat.keterangan, vCatat.idVendor);
+      return res.json({ sukses: true, pesan: `${row.nama_barang} - harga baru Rp ${Math.round(hargaBaru).toLocaleString('id-ID')} (avg harga, tanpa stock).` });
+    }
 
     let stockBaru = Number(row.total);
     let avgBaru = row.harga_barang != null ? Number(row.harga_barang) : null;

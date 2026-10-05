@@ -97,12 +97,13 @@ router.post('/api/opname/mulai', wajibGudang, async (req, res) => {
   try {
     const buka = await sesiTerbuka();
     if (buka) return res.status(409).json({ sukses: false, pesan: `Sesi ${buka.id_sesi} masih terbuka. Selesaikan/batalkan dulu.` });
-    const br = await sb.from('barang_inventory').select('id_barang,total,harga_barang').order('dibuat_pada', { ascending: true });
+    const br = await sb.from('barang_inventory').select('id_barang,kategori,total,harga_barang').order('dibuat_pada', { ascending: true });
     if (br.error) throw new Error(br.error.message);
     const idSesi = await buatIdSesi();
     const ins = await sb.from('opname_sesi').insert({ id_sesi: idSesi, status: 'HITUNG', dibuat_pada: nowIso() });
     if (ins.error) throw new Error(ins.error.message);
-    const rows = (br.data || []).map(b => ({
+    // ponytail: BASAH titipan vendor full tanpa stock — tak ikut opname
+    const rows = (br.data || []).filter(b => String(b.kategori || '').trim().toUpperCase() !== 'BASAH').map(b => ({
       id_sesi: idSesi, id_barang: b.id_barang,
       sistem_qty: Number(b.total) || 0,
       sistem_harga: b.harga_barang != null ? Number(b.harga_barang) : null,
@@ -196,6 +197,7 @@ router.post('/api/opname/:id/putus', wajibGudang, async (req, res) => {
       if (b.error) throw new Error(b.error.message);
       if (!b.data) { lewat++; continue; } // barang terhapus sesi-berjalan: lewati
       const row = b.data;
+      if (String(row.kategori || '').trim().toUpperCase() === 'BASAH') { lewat++; continue; } // titipan vendor: tanpa stock
       const selisih = Number(x.fisik_qty) - Number(row.total);
       if (!selisih) { lewat++; continue; }
       const avg = row.harga_barang != null ? Number(row.harga_barang) : null;

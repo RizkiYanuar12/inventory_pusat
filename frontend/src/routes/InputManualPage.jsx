@@ -102,7 +102,7 @@ export default function InputManualPage() {
                                 <div>
                                     <div className='fw-medium small'>{b.nama}</div>
                                     <div className='text-muted' style={{ fontSize: '11px' }}>
-                                        {b.kategori} • {b.satuanEceran} • stock {b.stock}
+                                        {b.kategori} • {b.satuanEceran}{String(b.kategori || '').trim().toLowerCase() === 'basah' ? '' : ` • stock ${b.stock}`}
                                     </div>
                                 </div>
                                 <Button size='sm' variant='primary' onClick={() => setDipilih(b)}>Pakai ini</Button>

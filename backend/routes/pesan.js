@@ -248,6 +248,8 @@ router.post('/api/pesanan/:id/keputusan', wajibGudang, async (req, res) => {
       for (const it of penuhi) {
         const b = ref.find(x => String(x.id_barang).trim() === String(it.id).trim());
         if (!b) return res.status(400).json({ sukses: false, pesan: `ID ${it.id} tidak dikenal.` });
+        // ponytail: BASAH = titipan vendor, tanpa cek stock — langsung bisa terima order
+        if (String(b.kategori || '').trim().toUpperCase() === 'BASAH') continue;
         if (Number(it.qtyKirim) > Number(b.total)) {
           return res.status(400).json({ sukses: false, pesan: `Stock ${b.nama_barang} kurang (minta ${it.qtyKirim}, sisa ${b.total}).` });
         }

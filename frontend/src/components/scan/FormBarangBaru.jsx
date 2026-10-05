@@ -21,6 +21,8 @@ export default function FormBarangBaru({ id, onSubmit, daftarBarang }) {
     const [vendorId, setVendorId] = useState('');
     const [daftarVendor, setDaftarVendor] = useState([]);
     const [errorMsg, setErrorMsg] = useState(null);
+    // ponytail: BASAH = titipan vendor full tanpa stock — jumlah hanya pembagi harga awal
+    const basah = String(kategori || '').trim().toLowerCase() === 'basah';
     const daftarKategori = useMemo(() => opsiKategori(daftarBarang), [daftarBarang]);
 
     useEffect(() => {
@@ -31,8 +33,8 @@ export default function FormBarangBaru({ id, onSubmit, daftarBarang }) {
         if (!nama.trim()) { setErrorMsg('Nama Barang wajib diisi.'); return; }
         if (!kategori.trim()) { setErrorMsg('Kategori Bahan wajib diisi.'); return; }
         if (!satuan.trim()) { setErrorMsg('Satuan wajib diisi.'); return; }
-        if (!(Number(stockMasuk) > 0)) { setErrorMsg('Stock Masuk harus angka > 0.'); return; }
-        if (!(Number(totalBayar) > 0)) { setErrorMsg('Total bayar (Rp) wajib diisi.'); return; }
+        if (!basah && !(Number(stockMasuk) > 0)) { setErrorMsg('Stock Masuk harus angka > 0.'); return; }
+        if (!(parseRibu(totalBayar) > 0)) { setErrorMsg(basah ? 'Harga awal (Rp) wajib diisi.' : 'Total bayar (Rp) wajib diisi.'); return; }
         if (isiPerGudang !== '' && !(Number(isiPerGudang) > 0)) { setErrorMsg('Isi per Satuan Gudang harus angka > 0 bila diisi.'); return; }
         setErrorMsg(null);
         onSubmit({
@@ -40,7 +42,7 @@ export default function FormBarangBaru({ id, onSubmit, daftarBarang }) {
             nama: nama.trim().replace(/\s+/g, ' '),
             varian: varian.trim(),
             kategori: kategori.trim(),
-            jumlah: Number(stockMasuk),
+            jumlah: basah ? 1 : Number(stockMasuk),
             restock: Number(minimum) || 5,
             totalBayar: parseRibu(totalBayar),
             satuanEceran: satuan.trim(),
@@ -92,15 +94,20 @@ export default function FormBarangBaru({ id, onSubmit, daftarBarang }) {
                 </Form.Group>
 
                 <div className="d-flex gap-2">
+                    {basah ? null : (
                     <Form.Group className="mb-2 flex-fill">
                         <Form.Label className="text-muted small mb-1">Stock Masuk *</Form.Label>
                         <Form.Control type="number" inputMode="numeric" min="1" value={stockMasuk} onChange={(e) => setStockMasuk(e.target.value)} placeholder="0" />
                     </Form.Group>
+                    )}
+                    {basah ? null : (
                     <Form.Group className="mb-2 flex-fill">
                         <Form.Label className="text-muted small mb-1">Minimum Stock *</Form.Label>
                         <Form.Control type="number" inputMode="numeric" min="0" value={minimum} onChange={(e) => setMinimum(e.target.value)} />
                     </Form.Group>
+                    )}
                 </div>
+                {basah && <p className="text-muted small mb-2">Titipan vendor — tanpa stock; cukup isi harga awal.</p>}
 
                 <Form.Group className="mb-2">
                     <Form.Label className="text-muted small mb-1">Keterangan</Form.Label>
@@ -108,7 +115,7 @@ export default function FormBarangBaru({ id, onSubmit, daftarBarang }) {
                 </Form.Group>
 
                 <Form.Group className="mb-3">
-                    <Form.Label className="text-muted small mb-1">Total bayar stock awal (Rp) *</Form.Label>
+                    <Form.Label className="text-muted small mb-1">{basah ? 'Harga awal (Rp) *' : 'Total bayar stock awal (Rp) *'}</Form.Label>
                     <Form.Control type="text" inputMode="numeric" value={formatRibu(totalBayar)} onChange={(e) => setTotalBayar(e.target.value.replace(/\D/g, ''))} placeholder="Wajib diisi" />
                 </Form.Group>
 

@@ -331,9 +331,13 @@ async function buatPengiriman(outlet, items, idPesan = null) {
     }
     const qty = Number(it.jumlah) * faktor;
     if (!qty || qty <= 0) throw new Error(`Jumlah ${row.nama_barang} tidak valid.`);
-    const stock = Number(row.total);
-    if (qty > stock) throw new Error(`Stock ${row.nama_barang} kurang (minta ${qty}, sisa ${stock}).`);
-    siap.push({ row, qty });
+    // ponytail: BASAH = titipan vendor — tanpa cek & tanpa potong stock, langsung lolos
+    const basah = String(row.kategori || '').trim().toUpperCase() === 'BASAH';
+    if (!basah) {
+      const stock = Number(row.total);
+      if (qty > stock) throw new Error(`Stock ${row.nama_barang} kurang (minta ${qty}, sisa ${stock}).`);
+    }
+    siap.push({ row, qty, basah });
   }
 
   const idKirim = await buatIdKirim();
@@ -351,7 +355,8 @@ async function buatPengiriman(outlet, items, idPesan = null) {
   // Gagal di tengah (balapan stock) -> kompensasi: kembalikan stock + hapus jejak, lalu throw.
   const jejak = []; // [{id_transaksi, id_barang, qty}]
   try {
-    for (const { row, qty } of siap) {
+    for (const { row, qty, basah } of siap) {
+      if (basah) continue; // titipan vendor: stock diam, tanpa jejak Keluar
       const hasil = await kurangStock(row.id_barang, qty);
       if (!hasil.ok) throw new Error(`Stock ${row.nama_barang} berubah saat diproses (sisa ${hasil.sisa}). Ulangi.`);
       const idTrx = await catatTransaksi(row.id_barang, row.nama_barang, row.merk,

@@ -56,6 +56,9 @@ const getCategoryColors = (kategori) => {
     return { bg: '#f8f9fa', text: '#6c757d', border: '#dee2e6' };
 };
 
+// BASAH = titipan vendor, bukan stock gudang: sembunyikan angka stock (harga tetap bisa diubah).
+const isBasah = (kategori) => String(kategori || '').trim().toLowerCase() === 'basah';
+
 // Form edit metadata + stock (overwrite mentah; ID terkunci; satuan butuh ketik-ulang konfirmasi)
 function EditForm({ item, opsiKategoriList, onSelesai }) {
     const [f, setF] = useState({
@@ -70,13 +73,16 @@ function EditForm({ item, opsiKategoriList, onSelesai }) {
     const set = (k) => (e) => setF(prev => ({ ...prev, [k]: e.target.value }));
     const normSatuanLokal = (u) => String(u || '').trim().toLowerCase();
     const gantiSatuan = f.satuanBaru.trim() !== '' && normSatuanLokal(f.satuanBaru) !== normSatuanLokal(item.satuanEceran || 'pcs');
+    const basah = isBasah(f.kategori);
 
     async function submit() {
         setErr('');
         const payload = {
             nama: f.nama, varian: f.varian, kategori: f.kategori,
-            restock: f.restock === '' ? undefined : Number(f.restock),
-            total: f.stock === '' ? undefined : Number(f.stock),
+            ...(isBasah(f.kategori) ? {} : {
+                restock: f.restock === '' ? undefined : Number(f.restock),
+                total: f.stock === '' ? undefined : Number(f.stock),
+            }),
             keterangan: f.keterangan,
             satuanGudang: f.satuanGudang, isiPerGudang: f.isi,
             hargaBarang: f.harga === '' ? null : Number(f.harga),
@@ -108,6 +114,7 @@ function EditForm({ item, opsiKategoriList, onSelesai }) {
                 <Form.Control size='sm' value={f.varian} onChange={set('varian')} />
             </Form.Group>
             <div className='d-flex gap-2'>
+                {basah ? null : (<>
                 <Form.Group className='mb-2 flex-fill'>
                     <Form.Label className='text-muted small mb-1'>Stock ({item.satuanEceran})</Form.Label>
                     <Form.Control size='sm' type='number' inputMode='numeric' min='0' value={f.stock} onChange={set('stock')} />
@@ -116,6 +123,7 @@ function EditForm({ item, opsiKategoriList, onSelesai }) {
                     <Form.Label className='text-muted small mb-1'>Batas Restock</Form.Label>
                     <Form.Control size='sm' type='number' inputMode='numeric' min='0' value={f.restock} onChange={set('restock')} />
                 </Form.Group>
+                </>)}
             </div>
                 <Form.Group className='mb-2'>
                     <Form.Label className='text-muted small mb-1'>Kategori</Form.Label>
@@ -260,10 +268,10 @@ export default function StockTable({ items, semua, onBerubah, mode = 'kartu' }) 
                                             </span>
                                         </td>
                                         <td className='num' style={st.kata === 'Aman' ? { fontWeight: 700 } : { color: st.warna, fontWeight: 800 }}>
-                                            {item.stock} <span className='text-muted fw-normal'>{item.satuanEceran}</span>
+                                            {isBasah(item.kategori) ? <span className='text-muted fw-normal'>-</span> : (<>{item.stock} <span className='text-muted fw-normal'>{item.satuanEceran}</span></>)}
                                         </td>
                                         <td className='num kol-batas text-muted'>
-                                            {item.threshold ?? '-'}
+                                            {isBasah(item.kategori) ? '-' : (item.threshold ?? '-')}
                                         </td>
                                         <td className='num kol-harga text-muted'>
                                             {item.hargaBarang != null ? rp(item.hargaBarang) : '-'}
@@ -272,11 +280,13 @@ export default function StockTable({ items, semua, onBerubah, mode = 'kartu' }) 
                                     {buka && (
                                         <tr className='detail'>
                                             <td colSpan={5}>
+                                                {isBasah(item.kategori) ? null : (<>
                                                 <div className='d-flex align-items-baseline gap-1'>
                                                     <span className='text-muted small'>Batas {item.threshold} {item.satuanEceran}</span>
                                                     <StatusBadge jumlahStock={item.stock} reStock={item.threshold} />
                                                 </div>
                                                 <StripUkur jumlahStock={item.stock} reStock={item.threshold} />
+                                                </>)}
                                                 {(item.satuanGrosir || item.keterangan) && (
                                                     <div className='text-muted small mt-1'>
                                                         {item.satuanGrosir && (
@@ -342,25 +352,31 @@ export default function StockTable({ items, semua, onBerubah, mode = 'kartu' }) 
                                 <span className="fw-bold fs-5 mb-0">
                                     {item.nama} {item.varian && <span className="fw-normal text-muted fs-6"> - {item.varian}</span>}
                                 </span>
-                                <StatusBadge jumlahStock={item.stock} reStock={item.threshold} />
+                                {isBasah(item.kategori) ? null : <StatusBadge jumlahStock={item.stock} reStock={item.threshold} />}
                             </div>
+                            {isBasah(item.kategori) ? (
+                                <div className="text-muted small mt-1">Titipan vendor — tanpa stock gudang.</div>
+                            ) : (<>
                             <div className="d-flex align-items-baseline gap-1 mt-1">
                                 <span className="fw-bolder fs-3 text-dark" style={{ fontVariantNumeric: 'tabular-nums' }}>{item.stock}</span>
                                 <span className="text-muted small">{item.satuanEceran}</span>
                                 <span className="text-muted small ms-auto">dari batas {item.threshold} {item.satuanEceran}</span>
                             </div>
                             <StripUkur jumlahStock={item.stock} reStock={item.threshold} />
+                            </>)}
                             {item.hargaBarang != null ? (
                                 <div className="mt-2 pt-2" style={{ borderTop: '1px solid #e9ecef' }}>
                                     <div className="d-flex flex-wrap justify-content-between align-items-baseline gap-2">
                                         <span className="text-muted small">
                                             Harga <strong className="text-dark" style={{ fontVariantNumeric: 'tabular-nums' }}>Rp {rp(item.hargaBarang)}</strong>/{item.satuanEceran}
                                         </span>
+                                        {isBasah(item.kategori) ? null : (
                                         <span className="small text-muted">
                                             Total <strong style={{ color: '#147A4A', fontVariantNumeric: 'tabular-nums' }}>
                                                 Rp {rp(Number(item.stock) * Number(item.hargaBarang))}
                                             </strong>
                                         </span>
+                                        )}
                                     </div>
                                 </div>
                             ) : (
@@ -384,9 +400,13 @@ export default function StockTable({ items, semua, onBerubah, mode = 'kartu' }) 
                             style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}
                         >
                             <div className="d-flex gap-3 small">
+                                {isBasah(item.kategori) ? (
+                                    <span className="text-muted">Titipan vendor</span>
+                                ) : (
                                 <span className="text-muted">
                                     <span className="fw-semibold">Batas:</span> {item.threshold} {item.satuanEceran}
                                 </span>
+                                )}
                             </div>
                             {(item.satuanGrosir || item.keterangan) && (
                                 <div className="text-muted small mt-1">
@@ -438,7 +458,7 @@ export default function StockTable({ items, semua, onBerubah, mode = 'kartu' }) 
                             </div>
                             <div className="d-flex gap-2 py-1">
                                 <span className="text-muted" style={{ width: 90 }}>Jumlah</span>
-                                <span>{hapus.stock} {hapus.satuanEceran}</span>
+                                <span>{isBasah(hapus.kategori) ? '-' : `${hapus.stock} ${hapus.satuanEceran}`}</span>
                             </div>
                             <Alert variant="warning" className="small mt-2 mb-0">
                                 Barang hilang dari katalog & tak bisa dipesan. Riwayat transaksinya tetap tersimpan di History.
