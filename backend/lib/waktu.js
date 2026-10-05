@@ -1,6 +1,6 @@
 // Jadwal Slot pengiriman (PRD seksi 7): Senin & Kamis, cutoff 15:00 WIB
 const SLOT_DAYS = [1, 4]; // Senin=1, Kamis=4 (getUTCDay/dayNum: Minggu=0)
-const SLOT_CUTOFF_JAM = 24;
+const SLOT_CUTOFF_JAM = 15;
 const NAMA_HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
