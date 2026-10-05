@@ -23,10 +23,14 @@ function BadgeStatus({ status }) {
 
 // Form putus per item untuk 1 kartu BARU.
 // State keyd by POSISI (index), bukan id — ID bisa kembar ('-', duplikat migrasi).
-function PutusForm({ pesanan, onSelesai }) {
-    const [mode, setMode] = useState({}); // {index: 'PENUHI'|'TOLAK'}
-    const [qty, setQty] = useState({}); // {index: qtyKirim} kosong = penuh
-    const [ket, setKet] = useState({}); // {index: keterangan}
+// Draf hidup di parent (keyed by idPesan) agar tak hilang saat kartu unmount (pindah tab/filter).
+function PutusForm({ pesanan, draf, onDraf, onSelesai }) {
+    const mode = (draf && draf.mode) || {};
+    const qty = (draf && draf.qty) || {};
+    const ket = (draf && draf.ket) || {};
+    const setMode = (up) => onDraf('mode', up);
+    const setQty = (up) => onDraf('qty', up);
+    const setKet = (up) => onDraf('ket', up);
     const [busy, setBusy] = useState(false);
 
     async function submit() {
@@ -169,6 +173,16 @@ export default function DaftarPengirimanPage() {
     const [busy, setBusy] = useState(false);
     const [tab, setTab] = useState('daftar');
     const [fCari, setFCari] = useState('');
+    // Draf putus per pesanan {idPesan: {mode, qty, ket}} — hidup di parent agar tak hilang
+    // saat kartu unmount (pindah tab/filter); dihapus setelah putus sukses.
+    const [draf, setDraf] = useState({});
+    function ubahDraf(idPesan, kunci, up) {
+        setDraf(d => {
+            const lama = (d[idPesan] && d[idPesan][kunci]) || {};
+            const baru = typeof up === 'function' ? up(lama) : { ...lama, ...up };
+            return { ...d, [idPesan]: { ...(d[idPesan] || {}), [kunci]: baru } };
+        });
+    }
     // Tab alur ganti dropdown status: antrean FIFO tertua-di-atas, arsip terbaru-di-atas.
     const TAB_ALUR = [
         { id: 'baru', label: 'Baru', status: ['BARU'], fifo: true },
@@ -392,7 +406,12 @@ export default function DaftarPengirimanPage() {
                                         <div>Kirim {p.rencanaKirim}</div>
                                     </div>
                                     <RingkasanPutus pesanan={p} />
-                                    {p.status === 'BARU' && <PutusForm pesanan={p} onSelesai={selesaiPutus} />}
+                                    {p.status === 'BARU' && <PutusForm pesanan={p} draf={draf[p.idPesan]}
+                                        onDraf={(kunci, up) => ubahDraf(p.idPesan, kunci, up)}
+                                        onSelesai={(s, pesan) => {
+                                            if (s) setDraf(d => { const n = { ...d }; delete n[p.idPesan]; return n; });
+                                            selesaiPutus(s, pesan);
+                                        }} />}
                                     {k && (k.status === 'SIAP KIRIM' || k.status === 'DIKIRIM') && (
                                         <div className='d-flex gap-2 mt-2 align-items-center flex-wrap'>
                                             <BadgeStatus status={k.status} />
