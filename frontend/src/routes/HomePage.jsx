@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { parseTimestamp, isSameDay, getMondayOf, addDays} from '../utils/dateParse';
 import RefreshButton from '../components/layout/RefreshButton'
 import UnduhAsetModal from '../components/homepage/UnduhAsetModal'
+import DaftarBarangModal from '../components/homepage/DaftarBarangModal'
 import LoncengGudang from '../components/layout/LoncengGudang'
 import { keluarGudang, fetchNotifikasi, fetchVendor, tambahVendor, ubahVendor, hapusVendor } from '../api/client'
 
@@ -33,14 +34,33 @@ export default function HomePage(){
     const emptyStockCount = barang.filter((b) => b.stock === 0).length
 
     // Total Aset Inventory (moving-average): Σ stock × harga_barang, tanpa item belum berhHarga.
-    const { totalAset, belumHarga } = useMemo(() => {
-        let total = 0, belum = 0
+    // belumDaftar = stock terbesar dulu (dampak aset terbesar di atas).
+    const { totalAset, belumHarga, belumDaftar } = useMemo(() => {
+        let total = 0
+        const tanpa = barang.filter(b => b.hargaBarang == null)
+            .sort((x, y) => (Number(y.stock) || 0) - (Number(x.stock) || 0));
         for (const b of barang) {
-            if (b.hargaBarang == null) { belum++; continue }
+            if (b.hargaBarang == null) continue
             total += (Number(b.stock) || 0) * Number(b.hargaBarang)
         }
-        return { totalAset: total, belumHarga: belum }
+        return {
+            totalAset: total,
+            belumHarga: tanpa.length,
+            belumDaftar: tanpa.map(b => ({ id: b.id, nama: b.nama, varian: b.varian || '',
+                info: `${Number(b.stock) || 0} ${b.satuanEceran || 'pcs'}` })),
+        }
     }, [barang])
+    // Daftar Stock Habis (0) + Menipis (<= threshold): untuk modal klik kartu.
+    const habisDaftar = useMemo(() => barang
+        .filter(b => Number(b.stock) === 0)
+        .sort((x, y) => String(x.nama).localeCompare(String(y.nama)))
+        .map(b => ({ id: b.id, nama: b.nama, varian: b.varian || '',
+            info: `0 ${b.satuanEceran || 'pcs'}` })), [barang]);
+    const menipisDaftar = useMemo(() => barang
+        .filter(b => Number(b.stock) > 0 && Number(b.stock) <= Number(b.threshold))
+        .sort((x, y) => (Number(x.stock) || 0) - (Number(y.stock) || 0))
+        .map(b => ({ id: b.id, nama: b.nama, varian: b.varian || '',
+            info: `${Number(b.stock) || 0}/${Number(b.threshold) || 0} ${b.satuanEceran || 'pcs'}` })), [barang]);
     const totalAsetRp = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(totalAset)
 
     const transaksiHariIni = useMemo(() => {
@@ -166,6 +186,8 @@ export default function HomePage(){
     const navigate = useNavigate()
     // Unduh rincian aset via modal (preview + kini/per-tanggal).
     const [bukaUnduh, setBukaUnduh] = useState(false);
+    // Modal daftar klik kartu: { judul, items } atau null (tutup).
+    const [daftar, setDaftar] = useState(null);
     function handleUnduhAset() {
         setBukaUnduh(true);
     }
@@ -207,7 +229,8 @@ export default function HomePage(){
                     <Row className="g-3 mb-3">
                         <Col xs={12}>
                             <div className='position-relative h-100'>
-                                <SummaryCard icon={Banknote} iconColor='#16a34a' label='Total Aset Inventory' value={totalAsetRp} unit={belumHarga > 0 ? `${belumHarga} item belum ada harga` : null} ukuran='fs-4' />
+                                <SummaryCard icon={Banknote} iconColor='#16a34a' label='Total Aset Inventory' value={totalAsetRp} unit={belumHarga > 0 ? `${belumHarga} item belum ada harga` : null} ukuran='fs-4'
+                                    onKlik={belumHarga > 0 ? () => setDaftar({ judul: `Belum ada harga (${belumHarga})`, items: belumDaftar }) : undefined} />
                                 <Button variant='link' size='sm' className='position-absolute top-0 end-0 p-2 text-muted'
                                     onClick={handleUnduhAset} disabled={isLoading || barang.length === 0}
                                     aria-label='Unduh rincian aset (CSV)' title='Unduh rincian aset (CSV)'>
@@ -221,10 +244,12 @@ export default function HomePage(){
                             <SummaryCard icon={Package} iconColor='#2563eb' label='Jumlah Barang' value={totalBarang}/>
                         </Col>
                         <Col xs={6} md={4}>
-                            <SummaryCard icon={TriangleAlert} iconColor='#f70505' label='Stock Habis' value={emptyStockCount} unit="barang habis" rel='#dc3545'/>
+                            <SummaryCard icon={TriangleAlert} iconColor='#f70505' label='Stock Habis' value={emptyStockCount} unit="barang habis" rel='#dc3545'
+                                onKlik={emptyStockCount > 0 ? () => setDaftar({ judul: `Stock Habis (${emptyStockCount})`, items: habisDaftar }) : undefined}/>
                         </Col>
                         <Col xs={6} md={4}>
-                            <SummaryCard icon={TriangleAlert} iconColor='#ffc107' label='Stock Menipis' value={lowStockCount} unit='barang menipis' rel='#ffc107'/>
+                            <SummaryCard icon={TriangleAlert} iconColor='#ffc107' label='Stock Menipis' value={lowStockCount} unit='barang menipis' rel='#ffc107'
+                                onKlik={lowStockCount > 0 ? () => setDaftar({ judul: `Stock Menipis (${lowStockCount})`, items: menipisDaftar }) : undefined}/>
                         </Col>
                         <Col xs={6} md={4}>
                             <SummaryCard icon={CircleArrowUp} iconColor='#7c3aed' label='Barang Keluar' value={keluarHariIni} unit="Hari Ini" />
@@ -343,6 +368,9 @@ export default function HomePage(){
             )}
             <UnduhAsetModal show={bukaUnduh} onTutup={() => setBukaUnduh(false)}
                 barang={barang} transaksi={transaksi} />
+            <DaftarBarangModal show={!!daftar} judul={daftar?.judul || ''} items={daftar?.items || []}
+                onLihat={(id) => { setDaftar(null); navigate('/inventory', { state: { search: id } }); }}
+                onTutup={() => setDaftar(null)} />
         </Container>
     )
 }

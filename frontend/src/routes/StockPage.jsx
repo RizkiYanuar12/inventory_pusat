@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Container, Row, Col, ButtonGroup, Button } from 'react-bootstrap'
 import { LayoutGrid, List } from 'lucide-react'
 import StockTable from '../components/stock/StockTable'
@@ -12,8 +12,10 @@ import { usePagination } from '../hooks/usePagination'
 
 export default function StockPage(){
     const navigate = useNavigate()
+    const location = useLocation();
     const {data: items, loading, error, refresh} = useBarang();
-    const [search, setSearch] = useState('');
+    // Pendaratan dari modal Dashboard (Lihat): cari langsung terisi ID item.
+    const [search, setSearch] = useState(location.state?.search || '');
     const [selectedCategory, setSelectedCategory] = useState('Semua');
     const [mode, setMode] = useState('kartu'); // 'kartu' | 'tabel'
     const filteredBarang = filterBarang(items, search, selectedCategory);
