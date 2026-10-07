@@ -9,7 +9,7 @@ export default defineConfig({
     proxy: {
       // Mengarahkan semua request yang memiliki awal /api
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3001',
         changeOrigin: true
       }
     }

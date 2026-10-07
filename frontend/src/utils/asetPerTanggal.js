@@ -26,6 +26,9 @@ const wib = (iso) => {
 export function hitungAsetPerTanggal(barang, transaksi, tglH) {
     const batas = new Date(`${tglH}T23:59:59.999+07:00`);
     if (isNaN(batas)) return { rows: [], total: 0 };
+    // ponytail: fallback harga master hanya untuk H==hari ini (WIB); H lalu tetap replay murni
+    const hariIni = new Date().toLocaleString('en-CA', { timeZone: 'Asia/Jakarta' }).slice(0, 10);
+    const kini = String(tglH || '') >= hariIni;
     const perId = {};
     for (const t of transaksi || []) {
         const w = wib(t.dibuatPada);
@@ -61,6 +64,9 @@ export function hitungAsetPerTanggal(barang, transaksi, tglH) {
             }
         }
         stockH = Math.max(0, Math.round(stockH * 1000) / 1000);
+        if (avg == null && kini && stockH > 0 && b.hargaBarang != null && Number(b.hargaBarang) >= 0) {
+            avg = Number(b.hargaBarang);
+        }
         const nilai = avg != null ? stockH * avg : null;
         if (nilai != null) total += nilai;
         rows.push({
@@ -84,7 +90,7 @@ export function asetPerTanggalKeCsv(barang, transaksi, tglH) {
     }
     baris.push(['TOTAL ASET', '', '', '', '', '', '', Math.round(total * 100) / 100]);
     const stamp = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
-    baris.push([`Posisi akhir ${tglH} WIB; barang terhapus tak termasuk. Diunduh ${stamp} WIB`, '', '', '', '', '', '', '']);
+    baris.push([`Posisi akhir ${tglH} WIB; barang terhapus tak termasuk. '-' = tanpa Masuk berhHarga s/d hari itu. Diunduh ${stamp} WIB`, '', '', '', '', '', '', '']);
     return '\uFEFF' + baris.map(r => r.map(selCsv).join(';')).join('\r\n');
 }
 

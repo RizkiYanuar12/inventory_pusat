@@ -6,7 +6,7 @@ import { barangKeCsv, unduhCsv } from '../../utils/unduhCsv';
 // Modal unduh aset: preview (hanya barang bermutasi s/d H) + unduh kini/per-tanggal/rentang.
 // Preview dan CSV pakai hitungan yang sama (hitungAsetPerTanggal).
 export default function UnduhAsetModal({ show, onTutup, barang, transaksi }) {
-    const hariIni = new Date().toISOString().slice(0, 10);
+    const hariIni = new Date().toLocaleString('en-CA', { timeZone: 'Asia/Jakarta' }).slice(0, 10);
     const [tgl, setTgl] = useState(hariIni);
     const [tglAwal, setTglAwal] = useState(hariIni);
     const [tglAkhir, setTglAkhir] = useState(hariIni);
