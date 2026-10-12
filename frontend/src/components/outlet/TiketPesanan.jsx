@@ -41,11 +41,24 @@ function langkah(status) {
         case 'DISETUJUI SEBAGIAN':
         case 'SIAP KIRIM': return 'Disiapkan gudang — tunggu paket dikirim.';
         case 'DIKIRIM': return 'Paket dikirim — isi surat jalan sekarang.';
-        case 'DITERIMA':
-        case 'DITERIMA SEBAGIAN': return 'Selesai — barang sudah diterima.';
+        case 'DITERIMA': return 'Selesai — semua barang sesuai.';
+        case 'DITERIMA SEBAGIAN': return 'Selesai — ada selisih, cek arsip surat jalan.';
         case 'DITOLAK': return 'Ditolak gudang — pesan ulang bila masih butuh.';
         default: return '';
     }
+}
+
+// Penjelas hitung sisi-putus (basis: pesan-vs-putus) agar "SEBAGIAN" tak rancu
+// dengan "SEBAGIAN" sisi-terima (basis: kirim-vs-terima). Null = tak perlu.
+function subPutus(status, items) {
+    const n = (items || []).length;
+    if (!n) return null;
+    if (status === 'DISETUJUI') return `Semua ${n} barang dipenuhi.`;
+    if (status === 'DISETUJUI SEBAGIAN') {
+        const p = (items || []).filter(it => String(it.keputusan || '').toUpperCase() === 'PENUHI').length;
+        return `Dipenuhi ${p} dari ${n} barang.`;
+    }
+    return null;
 }
 
 // Indeks tahap aktif di alur Pesan·Siapkan·Kirim·Terima (kontennya sekuens, jadi penanda urutan di sini justified).
@@ -106,6 +119,7 @@ export default function TiketPesanan({ pesanan: r, cta, bawah }) {
     const status = String(r.status || '').trim();
     const items = r.items || [];
     const totalPcs = items.reduce((a, it) => a + (Number(it.qtyPesan) || 0), 0);
+    const sub = subPutus(status, items);
     const idRinci = `rinci-${r.idPesan}`;
 
     return (
@@ -116,6 +130,7 @@ export default function TiketPesanan({ pesanan: r, cta, bawah }) {
                     <BadgeStatus status={status} />
                 </div>
                 <div className='small fw-medium'>▸ {langkah(status)}</div>
+                {sub && <div className='small text-muted'>• {sub}</div>}
                 <Alur status={status} />
                 <div style={{ fontSize: '12px' }}>
                     <div className='d-flex gap-2'><span className='text-muted flex-shrink-0' style={{ width: 88 }}>Dipesan</span><span>{r.tanggalPesan}</span></div>

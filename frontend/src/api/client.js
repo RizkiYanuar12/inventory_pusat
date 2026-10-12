@@ -285,6 +285,11 @@ export async function lihatSuratJalan(idKirim) {
     return handleRes(res, 'Gagal mengambil surat jalan');
 }
 
+export async function lihatSuratJalanPesanan(idPesan) {
+    const res = await fetch(`${BASE_URL}/surat-jalan/pesanan/${encodeURIComponent(idPesan)}`);
+    return handleRes(res, 'Gagal mengambil surat jalan');
+}
+
 export async function lihatSurat(tokenOutlet, idKirim) {
     const res = await fetch(`${BASE_URL}/pesan/${encodeURIComponent(tokenOutlet)}/surat/${encodeURIComponent(idKirim)}`);
     return handleRes(res, 'Surat jalan tidak ditemukan');

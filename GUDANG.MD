@@ -14,21 +14,21 @@
 
 Judul halaman **Pesanan & Kirim**. Pilihan tahap: **Baru / Siap Kirim / Dikirim / Diterima / Ditolak / Semua** (+ angka jumlah + pencarian). Urutan Baru/Siap/Dikirim: yang paling lama menunggu di atas; arsip: yang terbaru di atas.
 
-### Memutus pesanan BARU (per barang)
+### Memproses pesanan BARU (per barang)
 
 1. Buka kartu BARU. Tiap baris ada tombol **Penuhi** / **Tolak** (awalnya Penuhi).
 2. Penuhi penuh → biarkan kolom kirim kosong. Penuhi sebagian → isi kolom *"Kirim (= N), kosongkan bila penuh"* dengan jumlah yang dikirim + wajib isi *"Keterangan wajib: kenapa kurang (cth: stok tinggal 5)"*.
 3. Tolak → wajib isi *"Keterangan wajib (cth: habis)"*. Tanpa keterangan → ditolak merah oleh sistem.
-4. Tap **Putuskan** (satu klik untuk semua baris).
+4. Tap **Proses Pesanan** (satu klik untuk semua baris).
 5. Hasil otomatis, **tanpa tombol tambahan**:
    - Semua dipenuhi → **DISETUJUI**; sebagian → **DISETUJUI SEBAGIAN** (sisa hangus, outlet pesan ulang manual bila masih butuh); semua ditolak → **DITOLAK** (titik akhir, tanpa pengiriman, tanpa kurang stok).
-   - Bila ada yang dipenuhi, data pengiriman langsung terbentuk + **stok berkurang 1×** saat itu juga. Putus ulang → gagal dengan pesan merah (kartu BARU hanya bisa diputus sekali).
+   - Bila ada yang dipenuhi, data pengiriman langsung terbentuk + **stok berkurang 1×** saat itu juga. Proses ulang → gagal dengan pesan merah (kartu BARU hanya bisa diproses sekali).
 
 ### Mengirim paket
 
-1. Kartu SIAP KIRIM → tap **Verifikasi & Tandai** → pindah ke halaman `/input` layar verifikasi: tap kartu tiap baris + 1 foto paket (atau centang Lanjut tanpa foto). Tombol aktif setelah semua diceklis + foto.
+1. Kartu SIAP KIRIM → tap **Print Surat Jalan** (tempel di paket) → **Verifikasi & Tandai** → pindah ke halaman `/input` layar verifikasi: tap kartu tiap baris + 1 foto paket (atau centang Lanjut tanpa foto). Tombol aktif setelah semua diceklis + foto.
 2. Setelah paket diserahkan → tap tombol kirim hingga status **DIKIRIM**. Surat jalan langsung muncul di Tab Surat Jalan outlet.
-3. Tombol lain di kartu DIKIRIM: **Batalkan**, **Lacak** (lompat ke Tab Lacak), **Print** (buka surat jalan di tab baru).
+3. Tombol lain di kartu DIKIRIM: **Batalkan**, **Lacak** (lompat ke Tab Lacak). Tanpa tombol print — cetak wajib di SIAP KIRIM sebelum Tandai.
 
 ### Membatalkan pengiriman (mundur 1 langkah)
 
@@ -39,13 +39,13 @@ Judul halaman **Pesanan & Kirim**. Pilihan tahap: **Baru / Siap Kirim / Dikirim 
 
 - Langsung tampil semua kiriman terbaru-di-atas (20 awal + **Muat lagi**). Filter outlet/status/pencarian (termasuk kode kiriman). Klik kartu = buka/tutup detail.
 - Per barang: `Nama | Terkirim: X | Diterima: Y/-` + baris selisih (kurang/lebih + keterangan outlet) + foto **Kirim**/**Terima** bila ada + **Alasan** bila ada.
-- Tombol **Print / PDF** di detail membuka halaman surat jalan.
+- Tombol **Print Surat Jalan** di detail membuka halaman surat jalan (kecuali status DIKIRIM; arsip DITERIMA tetap bisa).
 
 ## 4. Surat jalan cetak
 
-- Dibuka via **Print** (kartu Daftar / detail Lacak). Judul ikut outlet: `SURAT JALAN - {OUTLET}`. Hanya terbit untuk DIKIRIM ke atas — kartu SIAP KIRIM tidak ada tombolnya (membuka alamatnya langsung → ditolak pesan merah).
-- Isi: tanggal pesan/kirim, tabel barang + harga satuan (harga rata-rata × jumlah; barang tanpa harga → 0 + catatan kaki), total akhir, kolom Checklist tangan (Procurement | Driver | Outlet), Penerima + PIC Pengirim. Baris TOLAK tercetak coret (harga `-`, tidak masuk total).
-- Cetak via tombol print browser (kertas A4 melebar). Kalau belum masuk → diminta login dulu.
+- Dibuka via **Print Surat Jalan** (kartu Daftar SIAP KIRIM / detail Lacak kecuali DIKIRIM; arsip DITERIMA tetap bisa) + **Print Draf** (kartu BARU, isi = jumlah pesanan apa adanya, sebelum diproses). Judul ikut outlet: `SURAT JALAN - {OUTLET}`. Gate 409 DICABUT 2026-10-11 (final terbit sejak SIAP KIRIM untuk ditempel di paket; DIKIRIM tetap peristiwa ceklis+foto).
+- Isi: tanggal pesan/kirim, tabel barang + harga satuan (harga rata-rata × jumlah; barang tanpa harga → 0 + catatan kaki), total akhir, kolom Checklist tangan kecil (Proc. | Driver | Outlet), Penerima + PIC Pengirim. Baris TOLAK tercetak coret (harga `-`, tidak masuk total).
+- Cetak via tombol print browser (kertas A4 portrait). Kalau belum masuk → diminta login dulu.
 
 ## 5. Tab Lainnya — Kelola Akun & password
 

@@ -132,14 +132,70 @@ router.post('/api/notifikasi/baca', wajibGudang, async (req, res) => {
   }
 });
 
+// Surat jalan draf dari pesanan (cetak awal sebelum putus; qty = qtyPesan apa adanya).
+// Baca-saja; format payload identik dengan cetak final agar layout reuse penuh.
+router.get('/api/surat-jalan/pesanan/:idPesan', wajibGudang, async (req, res) => {
+  try {
+    const p = await cariPesanan(req.params.idPesan);
+    if (!p) return res.status(404).json({ error: 'ID Pesan tidak ditemukan.' });
+    let arr = p.items_json;
+    if (typeof arr === 'string') { try { arr = JSON.parse(arr || '[]'); } catch { arr = []; } }
+    if (!Array.isArray(arr)) arr = [];
+    const tglDariLabel = (label) => {
+      try {
+        const m = String(label || '').match(/(\d{1,2}) ([A-Za-z]+) (\d{4})/);
+        if (m) {
+          const bi = NAMA_BULAN.findIndex(b => b.toLowerCase() === m[2].toLowerCase());
+          if (bi >= 0) return `${String(m[1]).padStart(2, '0')}/${String(bi + 1).padStart(2, '0')}/${m[3]}`;
+        }
+      } catch { /* fallback di bawah */ }
+      return '-';
+    };
+    const ref = await sb.from('barang_inventory').select('id_barang,satuan,harga_barang');
+    if (ref.error) throw new Error(ref.error.message);
+    const refMap = new Map((ref.data || []).map(b => [String(b.id_barang).trim(), b]));
+    let grandTotal = 0;
+    let adaTanpaHarga = false;
+    const items = arr.map((lp, i) => {
+      const b = refMap.get(String(lp.id || '').trim());
+      const qty = Number(lp.qtyPesan) || 0;
+      const harga = b && b.harga_barang != null ? Number(b.harga_barang) : 0;
+      if (!(b && b.harga_barang != null)) adaTanpaHarga = true;
+      const total = qty * harga;
+      grandTotal += total;
+      return {
+        no: i + 1,
+        ditolak: false,
+        outlet: String(p.outlet || '').trim(),
+        nama: lp.varian ? `${lp.nama} - ${lp.varian}` : (lp.nama || lp.id || '?'),
+        note: '',
+        qty,
+        satuan: (b && b.satuan) || String(lp.satuan || '').trim() || '-',
+        harga,
+        total,
+      };
+    });
+    res.json({
+      idKirim: String(p.id_pesan).trim(),
+      outlet: String(p.outlet || '').trim(),
+      tglPesan: tglDariLabel(p.tanggal_pemesanan),
+      tglKirim: tglDariLabel(p.tanggal_pengiriman),
+      items,
+      grandTotal,
+      adaTanpaHarga,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Surat jalan cetak (F8): payload siap-cetak per kiriman, baca-saja (tanpa endpoint tulis).
+// Terbit sejak SIAP KIRIM (dokumen ditempel di paket; DIKIRIM tetap peristiwa ceklis+foto).
 router.get('/api/surat-jalan/:idKirim', wajibGudang, async (req, res) => {
   try {
     const row = await cariPengiriman(req.params.idKirim);
     if (!row) return res.status(404).json({ error: 'ID Kirim tidak ditemukan.' });
-    if (String(row.status || '').trim() === 'SIAP KIRIM') {
-      return res.status(409).json({ error: 'Surat jalan hanya bisa dicetak setelah paket ditandai dikirim.' });
-    }
     let dikirim = row.items_json;
     if (typeof dikirim === 'string') { try { dikirim = JSON.parse(dikirim || '[]'); } catch { dikirim = []; } }
     if (!Array.isArray(dikirim)) dikirim = [];

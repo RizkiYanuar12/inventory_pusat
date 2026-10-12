@@ -22,7 +22,6 @@ function BadgeStatus({ status }) {
 }
 
 // Form putus per item untuk 1 kartu BARU.
-// State keyd by POSISI (index), bukan id — ID bisa kembar ('-', duplikat migrasi).
 // Draf hidup di parent (keyed by idPesan) agar tak hilang saat kartu unmount (pindah tab/filter).
 function PutusForm({ pesanan, draf, onDraf, onSelesai }) {
     const mode = (draf && draf.mode) || {};
@@ -51,15 +50,32 @@ function PutusForm({ pesanan, draf, onDraf, onSelesai }) {
         }
     }
 
+    const habis = (pesanan.items || []).filter(it => !it.titipan && it.stok != null && Number(it.stok) === 0);
+
     return (
         <div className='mt-2 border-top pt-2'>
+            {habis.length > 0 && (
+                <div className='alert alert-danger py-1 px-2 small mb-2'>
+                    <div className='fw-bold'>Stok kosong ({habis.length}):</div>
+                    <ul className='mb-0 ps-3'>
+                        {habis.map((it, j) => (
+                            <li key={`habis-${j}`}>{it.nama} <strong>x{it.qtyPesan} {it.satuan || 'pcs'}</strong> (stok 0)</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
             {(pesanan.items || []).map((it, i) => {
                 const m = mode[i] || 'PENUHI';
                 const parsial = m === 'PENUHI' && String(qty[i] ?? '') !== '' && Number(qty[i]) < Number(it.qtyPesan);
+                const stokHabis = !it.titipan && it.stok != null && Number(it.stok) === 0;
+                const stokKurang = !it.titipan && it.stok != null && Number(it.stok) > 0 && Number(it.stok) < Number(it.qtyPesan);
                 return (
                 <div key={`${it.id}#${i}`} className='mb-2'>
                     <div className='d-flex justify-content-between align-items-center'>
-                        <span className='small'>{it.nama} <strong>x{it.qtyPesan} {it.satuan || 'pcs'}</strong></span>
+                        <span className='small'>{it.nama} <strong>x{it.qtyPesan} {it.satuan || 'pcs'}</strong>
+                            {stokHabis && <Badge bg='danger' className='ms-1'>Stok 0</Badge>}
+                            {stokKurang && <Badge bg='warning' text='dark' className='ms-1'>Sisa {it.stok}</Badge>}
+                        </span>
                         <div className='d-flex gap-1'>
                             <Button size='sm' variant={m === 'PENUHI' ? 'success' : 'outline-success'}
                                 onClick={() => setMode(md => ({ ...md, [i]: 'PENUHI' }))}>Penuhi</Button>
@@ -82,13 +98,11 @@ function PutusForm({ pesanan, draf, onDraf, onSelesai }) {
                 );
             })}
             <Button size='sm' variant='primary' className='w-100' disabled={busy} onClick={submit}>
-                {busy ? '...' : 'Putuskan'}
+                {busy ? '...' : 'Proses Pesanan'}
             </Button>
         </div>
     );
 }
-
-// Hub pesanan gudang (Daftar + Lacak + Lainnya; Tab Buat manual dicabut 2026-09-14).
 
 // Ringkasan putus terstruktur: chip hitung + grup 1 baris tampil langsung
 // (tanpa toggle) + list penuhi dibatasi ambang + meta tanggal 2 baris.
@@ -100,7 +114,7 @@ function RingkasanPutus({ pesanan }) {
     const diputus = items.some(it => it.keputusan);
     if (!diputus) {
         const pcs = items.reduce((a, it) => a + (Number(it.qtyPesan) || 0), 0);
-        return <div className='text-muted my-1' style={{ fontSize: '11px' }}>{items.length} macam • {pcs} pcs</div>;
+        return <div className='text-muted my-1' style={{ fontSize: '12px' }}>{items.length} barang • {pcs} pcs</div>;
     }
     const penuhi = items.filter(it => String(it.keputusan || '').toUpperCase() === 'PENUHI');
     const tolak = items.filter(it => String(it.keputusan || '').toUpperCase() === 'TOLAK');
@@ -213,7 +227,7 @@ export default function DaftarPengirimanPage() {
         try {
             const [p, k, o, n] = await Promise.all([fetchPesanan(), fetchPengiriman(), fetchOutlet(), fetchNotifikasi()]);
             const s = {
-                p: sig(p, x => `${x.idPesan}:${x.status}`),
+                p: sig(p, x => `${x.idPesan}:${x.status}:${(x.items || []).map(i => i.stok ?? '-').join(',')}`),
                 k: sig(k, x => `${x.idKirim}:${x.status}:${x.token ? 1 : ''}`),
                 o: sig(o, x => `${x.slug}:${x.username || ''}:${x.punyaPassword ? 1 : ''}`),
                 n: n ? n.belumBaca : -1,
@@ -401,11 +415,18 @@ export default function DaftarPengirimanPage() {
                                         <strong className='small'>{p.idPesan} • {p.outlet}</strong>
                                         <BadgeStatus status={p.status} />
                                     </div>
-                                    <div className='text-muted' style={{ fontSize: '11px' }}>
+                                    <div className='text-muted' style={{ fontSize: '13px' }}>
                                         <div>Dipesan {p.tanggalPesan}</div>
                                         <div>Kirim {p.rencanaKirim}</div>
                                     </div>
                                     <RingkasanPutus pesanan={p} />
+                                    {p.status === 'BARU' && (
+                                        <div className='d-flex gap-2 mt-2 flex-wrap'>
+                                            <Button size='sm' variant='outline-secondary' onClick={() => window.open(`/surat-jalan/pesanan/${p.idPesan}`, '_blank')}>
+                                                Print Draf
+                                            </Button>
+                                        </div>
+                                    )}
                                     {p.status === 'BARU' && <PutusForm pesanan={p} draf={draf[p.idPesan]}
                                         onDraf={(kunci, up) => ubahDraf(p.idPesan, kunci, up)}
                                         onSelesai={(s, pesan) => {
@@ -428,9 +449,9 @@ export default function DaftarPengirimanPage() {
                                             <Button size='sm' variant='outline-secondary' onClick={() => { setLacakId(k.idKirim); setTab('lacak'); }}>
                                                 Lacak
                                             </Button>
-                                            {k.status !== 'SIAP KIRIM' && (
+                                            {k.status === 'SIAP KIRIM' && (
                                                 <Button size='sm' variant='outline-secondary' onClick={() => window.open(`/surat-jalan/${k.idKirim}`, '_blank')}>
-                                                    Print
+                                                    Print Surat Jalan
                                                 </Button>
                                             )}
                                         </div>
@@ -473,9 +494,9 @@ export default function DaftarPengirimanPage() {
                                                 Diterima: {k.tglTerima ? `${k.tglTerima} oleh ${k.namaPenerima}` : '-'}
                                             </div>
                                             {k.alasan && <div className='small text-muted mb-2'>Alasan: {k.alasan}</div>}
-                                            {k.status !== 'SIAP KIRIM' && (
+                                            {k.status !== 'DIKIRIM' && (
                                                 <Button size='sm' variant='outline-secondary' className='mb-2' onClick={() => window.open(`/surat-jalan/${k.idKirim}`, '_blank')}>
-                                                    Print / PDF
+                                                    Print Surat Jalan
                                                 </Button>
                                             )}
                                             {(k.fotoKirim || k.fotoTerima) && (

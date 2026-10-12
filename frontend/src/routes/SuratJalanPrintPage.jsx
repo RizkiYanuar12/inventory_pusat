@@ -1,20 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Container, Button, Alert, Table } from 'react-bootstrap';
-import { lihatSuratJalan } from '../api/client';
+import { lihatSuratJalan, lihatSuratJalanPesanan } from '../api/client';
 
 const rp = (n) => new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(n) || 0);
+const NBSP = String.fromCharCode(160); // spasi non-putus untuk sel coret kosong
 
-// Surat jalan cetak (F8, format spreadsheet): A4 landscape, tombol print manual.
+// Sel baris tolak: isi dibungkus span jangkar garis coret overlay (lihat App.css).
+// Sel kosong diisi nbsp agar segmen garis tetap ada (tak terlihat, hanya garis).
+function selCoret(ditolak, isi, cls) {
+    if (!ditolak) return <td className={cls}>{isi}</td>;
+    const tampil = isi === '' || isi == null ? NBSP : isi;
+    return <td className={cls}><span className='sj-isi'>{tampil}</span></td>;
+}
+
+// Surat jalan cetak (F8, format spreadsheet): A4 portrait, tombol print manual.
+// Dua pintu: final per kiriman (/surat-jalan/:idKirim) + draf per pesanan (/surat-jalan/pesanan/:idPesan).
 export default function SuratJalanPrintPage() {
-    const { idKirim } = useParams();
+    const { idKirim, idPesan } = useParams();
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        lihatSuratJalan(idKirim).then(setData).catch(e => setError(e.message));
+        (idPesan ? lihatSuratJalanPesanan(idPesan) : lihatSuratJalan(idKirim)).then(setData).catch(e => setError(e.message));
         // eslint-disable-next-line
-    }, [idKirim]);
+    }, [idKirim, idPesan]);
 
     if (error) return <Container className='py-5 text-center'><Alert variant='danger'>{error}</Alert></Container>;
     if (!data) return <p className='text-center py-5 text-muted'>Memuat surat jalan...</p>;
@@ -47,36 +57,48 @@ export default function SuratJalanPrintPage() {
             </div>
 
             <Table bordered size='sm' className='sj-tabel mb-1'>
+                <colgroup>
+                    <col style={{ width: '13%' }} />
+                    <col />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '6%' }} />
+                    <col style={{ width: '7%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '5%' }} />
+                    <col style={{ width: '5%' }} />
+                    <col style={{ width: '5%' }} />
+                </colgroup>
                 <thead>
                     <tr>
                         <th rowSpan={2}>Outlet</th>
                         <th rowSpan={2}>Nama Barang</th>
                         <th rowSpan={2}>Note</th>
                         <th rowSpan={2}>Qty</th>
-                        <th rowSpan={2}>Satuan</th>
-                        <th rowSpan={2}>Harga satuan</th>
-                        <th rowSpan={2}>Total Biaya</th>
-                        <th colSpan={3}>Checklist</th>
+                        <th rowSpan={2}>Sat.</th>
+                        <th rowSpan={2}>Harga</th>
+                        <th rowSpan={2}>Total</th>
+                        <th colSpan={3} className='sj-check'>Checklist</th>
                     </tr>
                     <tr>
-                        <th>Procurement</th>
-                        <th>Driver</th>
-                        <th>Outlet</th>
+                        <th className='sj-check'>Proc.</th>
+                        <th className='sj-check'>Driver</th>
+                        <th className='sj-check'>Outlet</th>
                     </tr>
                 </thead>
                 <tbody>
                     {data.items.map(it => (
                         <tr key={it.no} className={it.ditolak ? 'text-muted sj-coret' : ''}>
-                            <td>{it.outlet}</td>
-                            <td>{it.nama}</td>
-                            <td>{it.note}</td>
-                            <td className='text-end'>{it.qty}</td>
-                            <td>{it.satuan}</td>
-                            <td className='text-end'>{it.ditolak ? '-' : rp(it.harga)}</td>
-                            <td className='text-end'>{it.ditolak ? '-' : rp(it.total)}</td>
-                            <td />
-                            <td />
-                            <td />
+                            {selCoret(it.ditolak, it.outlet)}
+                            {selCoret(it.ditolak, it.nama)}
+                            {selCoret(it.ditolak, it.note)}
+                            {selCoret(it.ditolak, it.qty, 'text-end')}
+                            {selCoret(it.ditolak, it.satuan)}
+                            {selCoret(it.ditolak, it.ditolak ? '-' : rp(it.harga), 'text-end')}
+                            {selCoret(it.ditolak, it.ditolak ? '-' : rp(it.total), 'text-end')}
+                            {selCoret(it.ditolak, undefined, 'sj-check')}
+                            {selCoret(it.ditolak, undefined, 'sj-check')}
+                            {selCoret(it.ditolak, undefined, 'sj-check')}
                         </tr>
                     ))}
                     <tr className='fw-bold'>

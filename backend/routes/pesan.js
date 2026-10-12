@@ -19,6 +19,21 @@ router.get('/api/pesanan', wajibGudang, async (req, res) => {
     if (r.error) throw new Error(r.error.message);
     const daftar = r.data.map(x => pesananKeJson(x));
     for (const d of daftar) d.items = await terapkanSatuanLive(d.items);
+    // Stok live per line agar kartu BARU bisa flag stok-0 sebelum diputus (best-effort).
+    try {
+      const ref = await sb.from('barang_inventory').select('id_barang,total,kategori_bahan');
+      if (!ref.error && ref.data) {
+        const peta = new Map((ref.data || []).map(b => [String(b.id_barang).trim(), b]));
+        for (const d of daftar) {
+          d.items = (d.items || []).map(it => {
+            const b = peta.get(String(it.id || '').trim());
+            if (!b) return { ...it, stok: null, titipan: false };
+            const titipan = String(b.kategori_bahan || '').trim().toUpperCase() === 'BASAH';
+            return { ...it, stok: b.total != null ? Number(b.total) : null, titipan };
+          });
+        }
+      }
+    } catch { /* stok best-effort: kartu tetap tampil tanpa badge */ }
     res.json(daftar);
   } catch (err) {
     console.error(err);
@@ -245,14 +260,18 @@ router.post('/api/pesanan/:id/keputusan', wajibGudang, async (req, res) => {
       const br = await sb.from('barang_inventory').select('*');
       if (br.error) throw new Error(br.error.message);
       const ref = br.data;
+      const kurang = [];
       for (const it of penuhi) {
         const b = ref.find(x => String(x.id_barang).trim() === String(it.id).trim());
         if (!b) return res.status(400).json({ sukses: false, pesan: `ID ${it.id} tidak dikenal.` });
         // ponytail: BASAH = titipan vendor, tanpa cek stock — langsung bisa terima order
-        if (String(b.kategori || '').trim().toUpperCase() === 'BASAH') continue;
+        if (String(b.kategori_bahan || b.kategori || '').trim().toUpperCase() === 'BASAH') continue;
         if (Number(it.qtyKirim) > Number(b.total)) {
-          return res.status(400).json({ sukses: false, pesan: `Stock ${b.nama_barang} kurang (minta ${it.qtyKirim}, sisa ${b.total}).` });
+          kurang.push(`${b.nama_barang} (pesan: ${it.qtyKirim}, sisa stock: ${b.total})`);
         }
+      }
+      if (kurang.length) {
+        return res.status(400).json({ sukses: false, pesan: `Stok kurang: ${kurang.join('; ')}.` });
       }
       const hasil = await buatPengiriman(
         pesanan.outlet,
@@ -269,7 +288,7 @@ router.post('/api/pesanan/:id/keputusan', wajibGudang, async (req, res) => {
       items_json: putus,
       ringkasan: buatRingkasan(putus.map(it => ({ nama: it.nama, qtyPesan: it.qtyPesan, qtyKirim: it.qtyKirim, keputusan: it.keputusan, keterangan: it.keterangan }))),
       status,
-      riwayat_status: tambahRiwayat(pesanan.riwayat_status, status === 'DITOLAK' ? 'Ditolak semua (lihat keterangan per item)' : `Diputus ${status}${idKirim ? ` (${idKirim})` : ''}`),
+      riwayat_status: tambahRiwayat(pesanan.riwayat_status, status === 'DITOLAK' ? 'Ditolak semua (lihat keterangan per item)' : `Diproses ${status}${idKirim ? ` (${idKirim})` : ''}`),
     });
 
     res.json({ sukses: true, status, idKirim, pesan: status === 'DITOLAK' ? `Pesanan ${pesanan.id_pesan} DITOLAK.` : `Pesanan ${pesanan.id_pesan} ${status}, pengiriman ${idKirim} SIAP KIRIM.` });

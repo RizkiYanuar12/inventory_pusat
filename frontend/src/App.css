@@ -28,7 +28,7 @@
   }
 }
 
-/* Surat jalan cetak (F8): layar biasa; saat print hanya dokumen + A4 landscape */
+/* Surat jalan cetak (F8): layar biasa; saat print hanya dokumen + A4 portrait */
 .surat-jalan { max-width: 1000px; }
 .sj-info { gap: 1rem; }
 .sj-box { border-collapse: collapse; font-size: 13px; }
@@ -36,17 +36,25 @@
 .sj-box th { background: #d9ead3; font-weight: 600; }
 .sj-tabel { font-size: 12px; font-variant-numeric: tabular-nums; }
 .sj-tabel thead th { background: #b7b7b7; text-align: center; vertical-align: middle; }
-    /* Coretan ujung-ke-ujung baris tolak: tiap sel gambar segmen di tengah baris */
-.sj-coret td { position: relative; }
-.sj-coret td::after {
-  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+.sj-check { font-size: 10px; padding-left: 3px; padding-right: 3px; }
+    /* Coretan ujung-ke-ujung baris tolak: garis overlay dijangkar ke span isi
+   (block normal, tepercaya di print) — BUKAN ke td, karena position:relative
+   pada sel tabel diabaikan sebagian engine print sehingga garis nyasar. */
+.sj-coret .sj-isi { display: block; position: relative; }
+.sj-coret .sj-isi::after {
+  content: ''; position: absolute; left: -5px; right: -5px; top: 50%;
   border-top: 2px solid #8a8a8a;
 }
 @media print {
-  @page { size: A4 landscape; margin: 12mm; }
+  @page { size: A4 portrait; margin: 10mm; }
   .no-print, .fixed-bottom { display: none !important; }
   .app-root { padding-bottom: 0 !important; }
   .surat-jalan { max-width: none; }
+  .sj-tabel { font-size: 11px; width: 100%; table-layout: fixed; }
+  .sj-tabel th, .sj-tabel td { padding: 2px 4px; }
+  .sj-tabel thead th { white-space: nowrap; }
+  .sj-tabel tbody td { overflow-wrap: break-word; }
+  .sj-box { font-size: 12px; }
 }
 
 /* Kartu input barang-sudah-ada: kertas ledger + angka hero + cap stempel. */

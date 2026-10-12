@@ -53,7 +53,6 @@ function formatTanggalSlot(ymd) {
   return `${NAMA_HARI[a.getUTCDay()]}, ${d} ${NAMA_BULAN[m - 1]} ${y}`;
 }
 
-// Format bukti konkret: "Selasa, 08 September 2026 pukul 08.05 WIB"
 function formatWaktuBukti(date = new Date()) {
   return new Date(date).toLocaleString('id-ID', {
     timeZone: 'Asia/Jakarta',

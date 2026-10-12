@@ -37,6 +37,7 @@ function App() {
         <Route path='/transaksi-barang' element={<RequireGudang><TransaksiBarangPage /></RequireGudang>}></Route>
         <Route path='/pesanan' element={<RequireGudang><DaftarPengirimanPage /></RequireGudang>}></Route>
         <Route path='/opname' element={<RequireGudang><OpnamePage /></RequireGudang>}></Route>
+        <Route path='/surat-jalan/pesanan/:idPesan' element={<RequireGudang><SuratJalanPrintPage /></RequireGudang>}></Route>
         <Route path='/surat-jalan/:idKirim' element={<RequireGudang><SuratJalanPrintPage /></RequireGudang>}></Route>
       </Routes>
       {!tanpaNav && <BottomNav />}
