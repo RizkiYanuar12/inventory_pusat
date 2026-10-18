@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { sb } = require('../../db');
 const { wajibGudang } = require('../lib/auth');
-const { jakartaParts, formatWaktuBukti, NAMA_BULAN } = require('../lib/waktu');
+const { jakartaParts, formatWaktuBukti, bulanDariWaktuBukti, tglSingkatDariWaktuBukti, NAMA_BULAN } = require('../lib/waktu');
 const { tambahRiwayat } = require('../lib/ringkas');
 const {
   cariPengiriman, pengirimanKeJson, simpanPengiriman,
@@ -25,7 +25,7 @@ router.get('/api/pengiriman', wajibGudang, async (req, res) => {
 
 // Tandai Dikirim (manual): SIAP KIRIM -> DIKIRIM; surat muncul di Tab Surat Jalan outlet.
 // Gerbang verifikasi: ceklis per baris by POSISI index (ID bisa kembar '-') + foto kirim opsional.
-// Gagal upload foto di frontend tak memblokir — foto null tetap boleh Tandai.
+// Gagal upload foto di frontend tidak memblokir — foto null tetap boleh Tandai.
 router.post('/api/pengiriman/:id/kirim', wajibGudang, async (req, res) => {
   try {
     const row = await cariPengiriman(req.params.id);
@@ -105,7 +105,7 @@ router.post('/api/pengiriman/:id/batal-kirim', wajibGudang, async (req, res) => 
   }
 });
 
-// Lonceng gudang (pengganti WA): tulis best-effort, tak pernah gagalkan transaksi.
+// Lonceng gudang (pengganti WA): tulis best-effort, tidak pernah gagalkan transaksi.
 router.get('/api/notifikasi', wajibGudang, async (req, res) => {
   try {
     const [d, c] = await Promise.all([
@@ -132,6 +132,101 @@ router.post('/api/notifikasi/baca', wajibGudang, async (req, res) => {
   }
 });
 
+// Pembelian outlet per bulan: Σ jumlahKirim × harga_barang (moving-average, sama seperti F8) untuk
+// kiriman DIKIRIM/DITERIMA/DITERIMA SEBAGIAN pada bulan itu; harga NULL dilewati + dihitung (bukan Rp 0).
+// Baris PENUHI = `jumlahKirim` hasil keputusan gudang (termasuk parsial) — juga bahan dokumen unduhan.
+async function agregatPembelian(bulan) {
+  const [kirim, ref] = await Promise.all([
+    sb.from('pengiriman').select('id_kirim,outlet,status,tanggal_kirim,items_json').in('status', ['DIKIRIM', 'DITERIMA', 'DITERIMA SEBAGIAN']),
+    sb.from('barang_inventory').select('id_barang,satuan,harga_barang'),
+  ]);
+  if (kirim.error) throw new Error(kirim.error.message);
+  if (ref.error) throw new Error(ref.error.message);
+  const refMap = new Map((ref.data || []).map(b => [String(b.id_barang).trim(), b]));
+
+  const perOutletMap = new Map();
+  let total = 0;
+  let tanpaHarga = 0;
+  let jumlahKiriman = 0;
+  for (const k of kirim.data || []) {
+    if (bulanDariWaktuBukti(k.tanggal_kirim) !== bulan) continue;
+    let items = k.items_json;
+    if (typeof items === 'string') { try { items = JSON.parse(items || '[]'); } catch { items = []; } }
+    if (!Array.isArray(items)) continue;
+    const namaOutlet = String(k.outlet || '').trim() || '(tanpa nama)';
+    const row = perOutletMap.get(namaOutlet) || { outlet: namaOutlet, total: 0, kiriman: 0, tanpaHarga: 0, items: [] };
+    row.kiriman += 1;
+    jumlahKiriman += 1;
+    const idKirim = String(k.id_kirim || '').trim();
+    const tglKirim = tglSingkatDariWaktuBukti(k.tanggal_kirim) || '-';
+    for (const it of items) {
+      const b = refMap.get(String(it.id || '').trim());
+      const adaHarga = !!(b && b.harga_barang != null);
+      const qty = Number(it.jumlahKirim) || 0;
+      const harga = adaHarga ? Number(b.harga_barang) || 0 : null;
+      row.items.push({
+        idKirim,
+        tglKirim,
+        nama: it.varian ? `${it.nama} - ${it.varian}` : (it.nama || it.id || '?'),
+        note: `${idKirim || '-'} · ${tglKirim}`,
+        qty,
+        satuan: (b && b.satuan) || String(it.satuan || '').trim() || '-',
+        harga,
+        total: adaHarga ? qty * harga : null,
+      });
+      if (!adaHarga) { tanpaHarga += 1; row.tanpaHarga += 1; continue; }
+      row.total += qty * harga;
+      total += qty * harga;
+    }
+    perOutletMap.set(namaOutlet, row);
+  }
+  return { bulan, total, tanpaHarga, jumlahKiriman, perOutlet: [...perOutletMap.values()].sort((a, b) => b.total - a.total) };
+}
+
+// Default bulan kalender berjalan WIB; ?bulan=YYYY-MM untuk bulan lain.
+router.get('/api/pembelian', wajibGudang, async (req, res) => {
+  try {
+    const bulanIni = jakartaParts(new Date()).ymd.slice(0, 7);
+    const bulan = /^\d{4}-\d{2}$/.test(String(req.query.bulan || '')) ? String(req.query.bulan) : bulanIni;
+    res.json(await agregatPembelian(bulan));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Surat jalan ringkas per outlet per bulan: semua baris yang sudah disetujui gudang (PENUHI =
+// jumlahKirim) dari kiriman outlet itu dalam bulan tersebut; payload identik F8 -> halaman cetak reuse.
+router.get('/api/surat-jalan/bulanan', wajibGudang, async (req, res) => {
+  try {
+    const bulan = /^\d{4}-\d{2}$/.test(String(req.query.bulan || '')) ? String(req.query.bulan) : jakartaParts(new Date()).ymd.slice(0, 7);
+    const cari = String(req.query.outlet || '').trim();
+    const data = await agregatPembelian(bulan);
+    const row = data.perOutlet.find(o => o.outlet === cari);
+    if (!row) return res.status(404).json({ error: 'Belum ada barang terkirim untuk outlet ini pada bulan tersebut.' });
+
+    const [tahun, bln] = bulan.split('-').map(Number);
+    const akhir = new Date(Date.UTC(tahun, bln, 0)).getUTCDate();
+    const namaBulan = NAMA_BULAN[bln - 1];
+    const items = row.items.map((it, i) => ({ no: i + 1, ditolak: false, outlet: row.outlet, ...it }));
+    res.json({
+      idKirim: `Pembelian ${namaBulan} ${tahun}`,
+      outlet: row.outlet,
+      labelPesan: 'Periode',
+      tglPesan: `01/${String(bln).padStart(2, '0')}/${tahun} - ${String(akhir).padStart(2, '0')}/${String(bln).padStart(2, '0')}/${tahun}`,
+      labelKirim: 'Jumlah Kiriman',
+      tglKirim: `${row.kiriman} kiriman`,
+      sembunyiChecklist: true,
+      items,
+      grandTotal: row.total,
+      adaTanpaHarga: row.tanpaHarga > 0,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Surat jalan draf dari pesanan (cetak awal sebelum putus; qty = qtyPesan apa adanya).
 // Baca-saja; format payload identik dengan cetak final agar layout reuse penuh.
 router.get('/api/surat-jalan/pesanan/:idPesan', wajibGudang, async (req, res) => {
@@ -141,16 +236,7 @@ router.get('/api/surat-jalan/pesanan/:idPesan', wajibGudang, async (req, res) =>
     let arr = p.items_json;
     if (typeof arr === 'string') { try { arr = JSON.parse(arr || '[]'); } catch { arr = []; } }
     if (!Array.isArray(arr)) arr = [];
-    const tglDariLabel = (label) => {
-      try {
-        const m = String(label || '').match(/(\d{1,2}) ([A-Za-z]+) (\d{4})/);
-        if (m) {
-          const bi = NAMA_BULAN.findIndex(b => b.toLowerCase() === m[2].toLowerCase());
-          if (bi >= 0) return `${String(m[1]).padStart(2, '0')}/${String(bi + 1).padStart(2, '0')}/${m[3]}`;
-        }
-      } catch { /* fallback di bawah */ }
-      return '-';
-    };
+    const tglDariLabel = (label) => tglSingkatDariWaktuBukti(label) || '-';
     const ref = await sb.from('barang_inventory').select('id_barang,satuan,harga_barang');
     if (ref.error) throw new Error(ref.error.message);
     const refMap = new Map((ref.data || []).map(b => [String(b.id_barang).trim(), b]));
@@ -222,14 +308,7 @@ router.get('/api/surat-jalan/:idKirim', wajibGudang, async (req, res) => {
     let tglPesan = ddmmyyyy(ymdBuat);
     if (linePesan && linePesan.dibuat) tglPesan = ddmmyyyy(jakartaParts(new Date(linePesan.dibuat)).ymd);
     // tglKirim: parse string baku kita sendiri ("14 September 2026"); fallback = dibuat kiriman.
-    let tglKirim = ddmmyyyy(ymdBuat);
-    try {
-      const m = String(row.tanggal_kirim || '').match(/(\d{1,2}) ([A-Za-z]+) (\d{4})/);
-      if (m) {
-        const bi = NAMA_BULAN.findIndex(b => b.toLowerCase() === m[2].toLowerCase());
-        if (bi >= 0) tglKirim = `${String(m[1]).padStart(2, '0')}/${String(bi + 1).padStart(2, '0')}/${m[3]}`;
-      }
-    } catch { /* fallback di atas */ }
+    const tglKirim = tglSingkatDariWaktuBukti(row.tanggal_kirim) || ddmmyyyy(ymdBuat);
 
     const ref = await sb.from('barang_inventory').select('id_barang,satuan,harga_barang');
     if (ref.error) throw new Error(ref.error.message);

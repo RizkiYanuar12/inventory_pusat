@@ -1,6 +1,6 @@
 // Unduh CSV client-side (tanpa endpoint): rincian aset inventory + baris TOTAL.
 // Delimiter ';' + BOM agar rapi dibuka Excel Indonesia.
-function selCsv(v) {
+export function selCsv(v) {
     const s = String(v ?? '');
     return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
@@ -22,6 +22,32 @@ export function barangKeCsv(barang) {
     baris.push(['TOTAL ASET', '', '', '', '', '', '', total]);
     const stamp = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
     baris.push([`Diunduh pada ${stamp} WIB`, '', '', '', '', '', '', '']);
+    return '\uFEFF' + baris.map(r => r.map(selCsv).join(';')).join('\r\n');
+}
+
+// Rincian pembelian outlet per bulan (item yang disetujui gudang = jumlahKirim).
+// Kolom ID Kirim + Tgl Kirim disimpan terpisah karena satu dokumen bisa gabung beberapa kiriman.
+export function pembelianKeCsv(outlet, periode, items) {
+    const baris = [
+        [`SURAT JALAN - ${String(outlet || '').toUpperCase()}`],
+        ['Periode', periode || ''],
+        [],
+        ['No', 'ID Kirim', 'Tgl Kirim', 'Nama Barang', 'Note', 'Qty', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)'],
+    ];
+    let total = 0;
+    (items || []).forEach((it, i) => {
+        const harga = it.harga != null ? Number(it.harga) : null;
+        const nilai = harga != null ? (Number(it.qty) || 0) * harga : null;
+        if (nilai != null) total += nilai;
+        baris.push([
+            i + 1, it.idKirim || '', it.tglKirim || '', it.nama || '', it.note || '',
+            it.qty != null ? it.qty : '',
+            it.satuan || '',
+            harga != null ? harga : '',
+            nilai != null ? nilai : '',
+        ]);
+    });
+    baris.push(['TOTAL', '', '', '', '', '', '', '', total]);
     return '\uFEFF' + baris.map(r => r.map(selCsv).join(';')).join('\r\n');
 }
 

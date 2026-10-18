@@ -9,6 +9,7 @@ import {
 } from '../api/client';
 import LoncengGudang from '../components/layout/LoncengGudang';
 import ResultModal from '../components/common/ResultModal';
+import { useHub } from '../context/HubPesanan';
 
 const WARNA = {
     'BARU': 'secondary', 'DISETUJUI': 'primary', 'DISETUJUI SEBAGIAN': 'warning',
@@ -21,8 +22,8 @@ function BadgeStatus({ status }) {
     return <Badge bg={WARNA[status] || 'dark'}>{status}</Badge>;
 }
 
-// Form putus per item untuk 1 kartu BARU.
-// Draf hidup di parent (keyed by idPesan) agar tak hilang saat kartu unmount (pindah tab/filter).
+// Form putus per item untuk 1 kartu BARU; draf milik context (keyed idPesan)
+// agar tidak hilang saat kartu unmount atau pindah ke halaman surat jalan.
 function PutusForm({ pesanan, draf, onDraf, onSelesai }) {
     const mode = (draf && draf.mode) || {};
     const qty = (draf && draf.qty) || {};
@@ -104,8 +105,6 @@ function PutusForm({ pesanan, draf, onDraf, onSelesai }) {
     );
 }
 
-// Ringkasan putus terstruktur: chip hitung + grup 1 baris tampil langsung
-// (tanpa toggle) + list penuhi dibatasi ambang + meta tanggal 2 baris.
 const BATAS_TAMPIL = 4;
 function RingkasanPutus({ pesanan }) {
     const [bukaPenuhi, setBukaPenuhi] = useState(false);
@@ -183,13 +182,11 @@ export default function DaftarPengirimanPage() {
     const [modal, setModal] = useState({ show: false, sukses: false, pesan: '' });
     const [aksi, setAksi] = useState(null); // {mode: 'kirim'|'batal', id}
     const [alasan, setAlasan] = useState('');
-    const [lacakId, setLacakId] = useState('');
     const [busy, setBusy] = useState(false);
-    const [tab, setTab] = useState('daftar');
-    const [fCari, setFCari] = useState('');
-    // Draf putus per pesanan {idPesan: {mode, qty, ket}} — hidup di parent agar tak hilang
-    // saat kartu unmount (pindah tab/filter); dihapus setelah putus sukses.
-    const [draf, setDraf] = useState({});
+    // Draf putus per pesanan {idPesan: {mode, qty, ket}} hidup di context; dihapus setelah putus sukses.
+    const { tab, setTab, fCari, setFCari, fTab, setFTab, lacakId, setLacakId,
+        lStatus, setLStatus, lOutlet, setLOutlet, lCari, setLCari, batas, setBatas,
+        draf, setDraf } = useHub();
     function ubahDraf(idPesan, kunci, up) {
         setDraf(d => {
             const lama = (d[idPesan] && d[idPesan][kunci]) || {};
@@ -206,13 +203,8 @@ export default function DaftarPengirimanPage() {
         { id: 'ditolak', label: 'Ditolak', status: ['DITOLAK'], fifo: false },
         { id: 'semua', label: 'Semua', status: null, fifo: false },
     ];
-    const [fTab, setFTab] = useState('baru');
     const tabAlur = TAB_ALUR.find(t => t.id === fTab) || TAB_ALUR.find(t => t.id === 'semua');
     const hitungTab = (t) => pesanan.filter(p => !t.status || t.status.includes(p.status)).length;
-    const [lStatus, setLStatus] = useState('Semua');
-    const [lOutlet, setLOutlet] = useState('Semua');
-    const [lCari, setLCari] = useState('');
-    const [batas, setBatas] = useState(20);
 
     // load pesanan baru; sesi gudang mati (401) -> lempar ke halaman masuk.
     // Guard anti-tumpuk: tick baru dilewati bila siklus sebelumnya belum selesai.
@@ -422,7 +414,7 @@ export default function DaftarPengirimanPage() {
                                     <RingkasanPutus pesanan={p} />
                                     {p.status === 'BARU' && (
                                         <div className='d-flex gap-2 mt-2 flex-wrap'>
-                                            <Button size='sm' variant='outline-secondary' onClick={() => window.open(`/surat-jalan/pesanan/${p.idPesan}`, '_blank')}>
+                                            <Button size='sm' variant='outline-secondary' onClick={() => navigate(`/surat-jalan/pesanan/${p.idPesan}`)}>
                                                 Print Draf
                                             </Button>
                                         </div>
@@ -450,7 +442,7 @@ export default function DaftarPengirimanPage() {
                                                 Lacak
                                             </Button>
                                             {k.status === 'SIAP KIRIM' && (
-                                                <Button size='sm' variant='outline-secondary' onClick={() => window.open(`/surat-jalan/${k.idKirim}`, '_blank')}>
+                                                <Button size='sm' variant='outline-secondary' onClick={() => navigate(`/surat-jalan/${k.idKirim}`)}>
                                                     Print Surat Jalan
                                                 </Button>
                                             )}
@@ -495,7 +487,7 @@ export default function DaftarPengirimanPage() {
                                             </div>
                                             {k.alasan && <div className='small text-muted mb-2'>Alasan: {k.alasan}</div>}
                                             {k.status !== 'DIKIRIM' && (
-                                                <Button size='sm' variant='outline-secondary' className='mb-2' onClick={() => window.open(`/surat-jalan/${k.idKirim}`, '_blank')}>
+                                                <Button size='sm' variant='outline-secondary' className='mb-2' onClick={() => navigate(`/surat-jalan/${k.idKirim}`)}>
                                                     Print Surat Jalan
                                                 </Button>
                                             )}

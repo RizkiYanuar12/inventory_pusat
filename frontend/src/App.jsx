@@ -11,9 +11,10 @@ import SuratJalanPrintPage from './routes/SuratJalanPrintPage'
 import OpnamePage from './routes/OpnamePage'
 import RequireGudang from './components/layout/RequireGudang'
 import BottomNav from './components/layout/BottomNav'
+import { HubPesananProvider } from './context/HubPesanan'
 import './App.css'
 
-// Halaman publik outlet: tanpa BottomNav gudang (cocok segmen persis agar /pesanan tak ikut hilang)
+// Halaman publik outlet: tanpa BottomNav gudang (cocok segmen persis agar /pesanan tidak ikut hilang)
 const sembunyiNav = (pathname) =>
   pathname === '/pesan' || pathname.startsWith('/pesan/') ||
   pathname === '/gudang-masuk' || pathname.startsWith('/surat-jalan/');
@@ -24,6 +25,7 @@ function App() {
 
   return (
     <div className='app-root' style={{ minHeight: '100vh', paddingBottom: tanpaNav ? 0 : '80px', backgroundColor: '#f3f4f6' }}>
+      <HubPesananProvider>
       <Routes>
         {/* Publik: jalur outlet + login gudang */}
         <Route path='/pesan/:slugToken' element={<PesanOutletPage />}></Route>
@@ -38,8 +40,10 @@ function App() {
         <Route path='/pesanan' element={<RequireGudang><DaftarPengirimanPage /></RequireGudang>}></Route>
         <Route path='/opname' element={<RequireGudang><OpnamePage /></RequireGudang>}></Route>
         <Route path='/surat-jalan/pesanan/:idPesan' element={<RequireGudang><SuratJalanPrintPage /></RequireGudang>}></Route>
+        <Route path='/surat-jalan/bulanan' element={<RequireGudang><SuratJalanPrintPage /></RequireGudang>}></Route>
         <Route path='/surat-jalan/:idKirim' element={<RequireGudang><SuratJalanPrintPage /></RequireGudang>}></Route>
       </Routes>
+      </HubPesananProvider>
       {!tanpaNav && <BottomNav />}
     </div>
   )

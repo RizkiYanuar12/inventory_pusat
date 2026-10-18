@@ -4,17 +4,17 @@ import FastMovingTable from  '../components/homepage/FastMovingTable'
 import SummaryCard from '../components/homepage/SummaryCard'
 import TrendChart from '../components/homepage/TrendChart'
 import WeekFilter from '../components/homepage/WeekFilter'
-import { Package, TriangleAlert, CircleArrowDown, CircleArrowUp, Banknote, LogOut, Download } from 'lucide-react'
+import { Package, TriangleAlert, CircleArrowDown, CircleArrowUp, Banknote, LogOut, Download, ShoppingCart } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { parseTimestamp, isSameDay, getMondayOf, addDays} from '../utils/dateParse';
+import { parseTimestamp, isSameDay, getMondayOf, addDays, labelBulan} from '../utils/dateParse';
 import RefreshButton from '../components/layout/RefreshButton'
 import UnduhAsetModal from '../components/homepage/UnduhAsetModal'
+import PembelianModal from '../components/homepage/PembelianModal'
 import DaftarBarangModal from '../components/homepage/DaftarBarangModal'
 import LoncengGudang from '../components/layout/LoncengGudang'
-import { keluarGudang, fetchNotifikasi, fetchVendor, tambahVendor, ubahVendor, hapusVendor } from '../api/client'
+import { keluarGudang, fetchNotifikasi, fetchVendor, tambahVendor, ubahVendor, hapusVendor, fetchPembelian } from '../api/client'
 
-// Import komponen React Bootstrap
 import { Container, Row, Col, Card, Button, Form } from 'react-bootstrap';
 
 const HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
@@ -33,7 +33,7 @@ export default function HomePage(){
     const lowStockCount = barang.filter((b) => b.stock <= b.threshold && b.stock > 0).length
     const emptyStockCount = barang.filter((b) => b.stock === 0).length
 
-    // Total Aset Inventory (moving-average): Σ stock × harga_barang, tanpa item belum berhHarga.
+    // Total Aset Inventory = Σ stock × harga_barang; item tanpa harga dikeluarkan, bukan Rp 0.
     // belumDaftar = stock terbesar dulu (dampak aset terbesar di atas).
     const { totalAset, belumHarga, belumDaftar } = useMemo(() => {
         let total = 0
@@ -138,6 +138,15 @@ export default function HomePage(){
     }
     useEffect(() => { muatNotifikasi() }, [])
 
+    // Pembelian outlet bulan berjalan (kartu dashboard; klik = rincian per outlet).
+    const [pembelian, setPembelian] = useState(null)
+    function muatPembelian() {
+        fetchPembelian().then(setPembelian).catch(() => {});
+    }
+    useEffect(() => { muatPembelian() }, [])
+    const labelPembelian = labelBulan(pembelian?.bulan) || null
+    const totalPembelianRp = new Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', maximumFractionDigits:0 }).format(pembelian?.total || 0)
+
     // Master vendor (CRUD sederhana; tanpa relasi; ikut loading/refresh)
     const [vendor, setVendor] = useState([]);
     const [vNama, setVNama] = useState('');
@@ -181,13 +190,14 @@ export default function HomePage(){
         refreshTransaksi()
         muatNotifikasi()
         muatVendor()
+        muatPembelian()
     }
 
     const navigate = useNavigate()
-    // Unduh rincian aset via modal (preview + kini/per-tanggal).
     const [bukaUnduh, setBukaUnduh] = useState(false);
-    // Modal daftar klik kartu: { judul, items } atau null (tutup).
+    // Modal daftar dari klik kartu: { judul, items } atau null (tutup).
     const [daftar, setDaftar] = useState(null);
+    const [bukaPembelian, setBukaPembelian] = useState(false);
     function handleUnduhAset() {
         setBukaUnduh(true);
     }
@@ -256,6 +266,12 @@ export default function HomePage(){
                         </Col>
                         <Col xs={6} md={4}>
                             <SummaryCard icon={CircleArrowDown} iconColor='#00f000' label='Barang Masuk' value={masukHariIni} unit="Hari Ini" />
+                        </Col>
+                        <Col xs={6} md={4}>
+                            <SummaryCard icon={ShoppingCart} iconColor='#0f766e' label='Pembelian Outlet'
+                                value={pembelian ? totalPembelianRp : '—'} unit={labelPembelian || 'Bulan ini'}
+                                sub={pembelian && pembelian.jumlahKiriman > 0 ? `${pembelian.jumlahKiriman} kiriman terkirim` : null}
+                                onKlik={() => setBukaPembelian(true)} />
                         </Col>
                     </Row>
 
@@ -371,6 +387,7 @@ export default function HomePage(){
             <DaftarBarangModal show={!!daftar} judul={daftar?.judul || ''} items={daftar?.items || []}
                 onLihat={(id) => { setDaftar(null); navigate('/inventory', { state: { search: id } }); }}
                 onTutup={() => setDaftar(null)} />
+            <PembelianModal show={bukaPembelian} onTutup={() => setBukaPembelian(false)} />
         </Container>
     )
 }

@@ -1,10 +1,7 @@
 // Aset per tanggal (posisi akhir H 23:59:59 WIB): rekonstruksi mundur stock +
 // replay maju moving-average dari transaksi. H < hari-migrasi -> rows kosong,
 // TOTAL 0 (ditulis CSV sebagai header + TOTAL + baris metode, bukan error).
-function selCsv(v) {
-    const s = String(v ?? '');
-    return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+import { selCsv } from './unduhCsv';
 
 // Copy rumus backend hitungAvg (lib/konversi.js): avg = (t*avgLama + bayar)/(t+q).
 function avgLanjut(avgLama, totalLama, totalBayar, qtyMasuk) {

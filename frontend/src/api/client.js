@@ -61,6 +61,13 @@ export async function fetchPengiriman() {
     return handleRes(res, 'Gagal mengambil data pengiriman');
 }
 
+// Pembelian outlet per bulan (kartu dashboard); bulan kosong = bulan berjalan.
+export async function fetchPembelian(bulan) {
+    const q = bulan ? `?bulan=${encodeURIComponent(bulan)}` : '';
+    const res = await fetch(`${BASE_URL}/pembelian${q}`);
+    return handleRes(res, 'Gagal mengambil data pembelian');
+}
+
 // Master vendor (CRUD sederhana; tanpa relasi)
 export async function fetchVendor() {
     const res = await fetch(`${BASE_URL}/vendor`);
@@ -287,6 +294,12 @@ export async function lihatSuratJalan(idKirim) {
 
 export async function lihatSuratJalanPesanan(idPesan) {
     const res = await fetch(`${BASE_URL}/surat-jalan/pesanan/${encodeURIComponent(idPesan)}`);
+    return handleRes(res, 'Gagal mengambil surat jalan');
+}
+
+// Surat jalan ringkas: item yang sudah disetujui gudang untuk 1 outlet pada 1 bulan.
+export async function lihatSuratJalanBulanan(outlet, bulan) {
+    const res = await fetch(`${BASE_URL}/surat-jalan/bulanan?outlet=${encodeURIComponent(outlet)}&bulan=${encodeURIComponent(bulan)}`);
     return handleRes(res, 'Gagal mengambil surat jalan');
 }
 

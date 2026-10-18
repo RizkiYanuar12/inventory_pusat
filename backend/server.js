@@ -13,7 +13,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const { hitungSlot, formatTanggalSlot, formatWaktuBukti } = require('./lib/waktu');
+const { hitungSlot, formatTanggalSlot, formatWaktuBukti, bulanDariWaktuBukti, tglSingkatDariWaktuBukti } = require('./lib/waktu');
 const { buatRingkasan, buatRingkasanKirim, buatAlasan } = require('./lib/ringkas');
 const { hitungAvg } = require('./lib/konversi');
 const { initDb, scheduleRandomSampling } = require('./lib/data');
@@ -22,7 +22,7 @@ const { mulaiPruneSesi } = require('./lib/auth');
 // Di belakang proxy (ngrok/hosting): percayai X-Forwarded-Proto agar deteksi HTTPS benar.
 app.set('trust proxy', 1);
 
-// CORS kunci: same-origin app tak terpengaruh; hanya lintas-situs yang disaring.
+// CORS kunci: same-origin app tidak terpengaruh; hanya lintas-situs yang disaring.
 // Selalu lolos: tanpa Origin (curl), localhost, *.ngrok-free.dev (fase uji).
 // Domain prod: ENV CORS_ORIGIN (koma-pisah).
 const CORS_TAMBAHAN = String(process.env.CORS_ORIGIN || '').split(',')
@@ -38,7 +38,7 @@ app.use(cors({
   },
 }));
 app.use(express.json());
-// Di Vercel: static dilayani platform (frontend/dist tak ikut bundle function).
+// Di Vercel: static dilayani platform (frontend/dist tidak ikut bundle function).
 if (!process.env.VERCEL) app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 // Data: Supabase 5 tabel (barang_inventory, transaksi, pesanan, pengiriman, outlet).
@@ -100,6 +100,30 @@ function jalankanSelfCheck() {
     const ok = hasil === exp;
     if (!ok) gagal++;
     console.log(`${ok ? 'OK  ' : 'FAIL'} avg ${label} -> ${hasil} (exp ${exp})`);
+  }
+  const bulanKasus = [
+    // [label, input tanggal_kirim, exp 'YYYY-MM'|null]
+    ['kirim 10 Sep', 'Kamis, 10 September 2026 pukul 08.05 WIB', '2026-09'],
+    ['kapital kecil', 'senin, 1 agustus 2026 pukul 09.00 WIB', '2026-08'],
+    ['belum terkirim', '', null],
+    ['bukan tanggal', 'Tercatat', null],
+  ];
+  for (const [label, input, exp] of bulanKasus) {
+    const hasil = bulanDariWaktuBukti(input);
+    const ok = hasil === exp;
+    if (!ok) gagal++;
+    console.log(`${ok ? 'OK  ' : 'FAIL'} bulan ${label} -> ${hasil} (exp ${exp})`);
+  }
+  const tglKasus = [
+    ['8 Okt', 'Kamis, 08 Oktober 2026 pukul 07.30 WIB', '08/10/2026'],
+    ['kapital kecil', 'senin, 1 agustus 2026 pukul 09.00 WIB', '01/08/2026'],
+    ['bukan tanggal', '', null],
+  ];
+  for (const [label, input, exp] of tglKasus) {
+    const hasil = tglSingkatDariWaktuBukti(input);
+    const ok = hasil === exp;
+    if (!ok) gagal++;
+    console.log(`${ok ? 'OK  ' : 'FAIL'} tgl ${label} -> ${hasil} (exp ${exp})`);
   }
   process.exit(gagal ? 1 : 0);
 }

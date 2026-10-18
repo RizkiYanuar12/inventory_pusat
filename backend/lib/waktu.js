@@ -66,6 +66,25 @@ function formatWaktuBukti(date = new Date()) {
   });
 }
 
+// Kolom tanggal_kirim/tanggal_terima hanya string panjang formatWaktuBukti (tidak bisa
+// difilter SQL) -> ambil kunci bulan 'YYYY-MM' untuk agregasi. null = belum terkirim / bukan tanggal.
+function bulanDariWaktuBukti(str) {
+  const m = String(str || '').match(/(\d{1,2}) ([A-Za-z]+) (\d{4})/);
+  if (!m) return null;
+  const bulan = NAMA_BULAN.findIndex(n => n.toLowerCase() === m[2].toLowerCase());
+  if (bulan < 0) return null;
+  return `${m[3]}-${String(bulan + 1).padStart(2, '0')}`;
+}
+
+// Versi 'DD/MM/YYYY' dari string formatWaktuBukti (sumber sama, buat kolom Tgl Kirim).
+function tglSingkatDariWaktuBukti(str) {
+  const m = String(str || '').match(/(\d{1,2}) ([A-Za-z]+) (\d{4})/);
+  if (!m) return null;
+  const bulan = NAMA_BULAN.findIndex(n => n.toLowerCase() === m[2].toLowerCase());
+  if (bulan < 0) return null;
+  return `${String(m[1]).padStart(2, '0')}/${String(bulan + 1).padStart(2, '0')}/${m[3]}`;
+}
+
 // Gate loket pesan: Senin–Sabtu di bawah jam cutoff; Minggu libur total.
 function pesanDibuka(waktu = new Date()) {
   const { dayNum, jam } = jakartaParts(new Date(waktu));
@@ -78,6 +97,6 @@ const PESAN_TUTUP_MINGGU = 'Hari Minggu libur — loket buka Senin–Sabtu di ba
 module.exports = {
   SLOT_DAYS, SLOT_CUTOFF_JAM, NAMA_HARI, NAMA_BULAN,
   jakartaParts, anchorDariYmd, geserHari, slotBerikutnya,
-  hitungSlot, formatTanggalSlot, formatWaktuBukti,
+  hitungSlot, formatTanggalSlot, formatWaktuBukti, bulanDariWaktuBukti, tglSingkatDariWaktuBukti,
   pesanDibuka, PESAN_TUTUP, PESAN_TUTUP_MINGGU,
 };

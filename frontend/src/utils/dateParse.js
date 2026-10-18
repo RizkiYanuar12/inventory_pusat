@@ -1,6 +1,6 @@
-// Format Timestamp pada worksheet transaksi tersimpan sebagai teks hasil
-// 14/08/2026, 17.24.01 (DD/MM/YYYY, HH.MM.ss)
-// Fungsi akan mengubah menjadi objek date untuk bisa dibandingkan
+// Timestamp keluaran formatWaktuBukti (WIB), mis. "Selasa, 08 September 2026 pukul 08.05 WIB";
+// detik opsional. Hanya format itu yang dikenali — teks lain (mis. "14/08/2026, 17.24" era Sheet lama)
+// kembali null dan harus diabaikan pemanggil.
 
 const BULAN = {
     januari: 0, februari: 1, maret: 2, april: 3, mei: 4, juni: 5, juli: 6,
@@ -55,4 +55,12 @@ export function addDays(date, amount){
     const d = new Date(date)
     d.setDate(d.getDate() + amount)
     return d
+}
+
+// 'YYYY-MM' -> 'Oktober 2026' (label kartu & nama periode unduhan).
+export function labelBulan(ym){
+    if (!ym) return ''
+    const [tahun, bulan] = String(ym).split('-').map(Number)
+    if (!tahun || !bulan) return ''
+    return new Date(tahun, bulan - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
 }
