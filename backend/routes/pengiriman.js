@@ -144,11 +144,23 @@ async function agregatPembelian(bulan) {
   if (ref.error) throw new Error(ref.error.message);
   const refMap = new Map((ref.data || []).map(b => [String(b.id_barang).trim(), b]));
 
+  // Urut kiriman: tanggal kirim terbaru dulu; tanggal sama -> ID Kirim terbaru dulu.
+  // tanggal_kirim berupa string panjang Indonesia, jadi kunci sort dibentuk YYYYMMDD.
+  const urutTanggal = (k) => {
+    const t = tglSingkatDariWaktuBukti(k.tanggal_kirim) || '';
+    const [d, m, y] = t.split('/');
+    return y && m && d ? `${y}${m}${d}` : '';
+  };
+  kirim.data = (kirim.data || []).sort((a, b) =>
+    urutTanggal(b).localeCompare(urutTanggal(a)) ||
+    String(b.id_kirim || '').localeCompare(String(a.id_kirim || ''))
+  );
+
   const perOutletMap = new Map();
   let total = 0;
   let tanpaHarga = 0;
   let jumlahKiriman = 0;
-  for (const k of kirim.data || []) {
+  for (const k of kirim.data) {
     if (bulanDariWaktuBukti(k.tanggal_kirim) !== bulan) continue;
     let items = k.items_json;
     if (typeof items === 'string') { try { items = JSON.parse(items || '[]'); } catch { items = []; } }
