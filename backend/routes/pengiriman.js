@@ -156,6 +156,7 @@ async function agregatPembelian(bulan) {
     String(b.id_kirim || '').localeCompare(String(a.id_kirim || ''))
   );
 
+  const namaItem = (it) => it.varian ? `${it.nama} - ${it.varian}` : (it.nama || it.id || '?');
   const perOutletMap = new Map();
   let total = 0;
   let tanpaHarga = 0;
@@ -171,7 +172,9 @@ async function agregatPembelian(bulan) {
     jumlahKiriman += 1;
     const idKirim = String(k.id_kirim || '').trim();
     const tglKirim = tglSingkatDariWaktuBukti(k.tanggal_kirim) || '-';
-    for (const it of items) {
+    // Dalam satu ID Kirim, baris diurutkan A-Z; antar-kiriman tetap tanggal terbaru dulu.
+    const itemsUrut = items.slice().sort((a, b) => namaItem(a).localeCompare(namaItem(b), 'id', { sensitivity: 'base' }));
+    for (const it of itemsUrut) {
       const b = refMap.get(String(it.id || '').trim());
       const adaHarga = !!(b && b.harga_barang != null);
       const qty = Number(it.jumlahKirim) || 0;
@@ -179,7 +182,7 @@ async function agregatPembelian(bulan) {
       row.items.push({
         idKirim,
         tglKirim,
-        nama: it.varian ? `${it.nama} - ${it.varian}` : (it.nama || it.id || '?'),
+        nama: namaItem(it),
         note: `${idKirim || '-'} · ${tglKirim}`,
         qty,
         satuan: (b && b.satuan) || String(it.satuan || '').trim() || '-',
