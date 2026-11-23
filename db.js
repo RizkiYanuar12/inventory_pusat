@@ -18,6 +18,18 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const nowIso = () => new Date().toISOString();
 
+// Supabase membatasi 1000 baris/query: paging transparan untuk query list tanpa batas.
+async function ambilSemua(buatQuery, HAL = 1000) {
+  const semua = [];
+  for (let dari = 0; ; dari += HAL) {
+    const r = await buatQuery().range(dari, dari + HAL - 1);
+    if (r.error) throw new Error(r.error.message);
+    semua.push(...(r.data || []));
+    if (!r.data || r.data.length < HAL) break;
+  }
+  return semua;
+}
+
 // Kurang stock atomik: tulis hanya bila stock >= qty (anti oversell saat 2 approve balapan)
 async function kurangStock(idBarang, qty) {
   const cur = await sb.from('barang_inventory')
@@ -34,4 +46,4 @@ async function kurangStock(idBarang, qty) {
   return { ok: true, sisa: Number(up.data[0].total) };
 }
 
-module.exports = { sb, nowIso, kurangStock };
+module.exports = { sb, nowIso, kurangStock, ambilSemua };

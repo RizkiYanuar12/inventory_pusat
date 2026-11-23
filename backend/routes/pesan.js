@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
-const { sb, nowIso } = require('../../db');
+const { sb, nowIso, ambilSemua } = require('../../db');
 const { wajibGudang, wajibOutlet, simpanSesi, UMUR_SESI_OUTLET_MS, namaCookieOutlet, hashKataSandi, cekKataSandi, kenaRate, atributSecure } = require('../lib/auth');
 const { jakartaParts, hitungSlot, formatWaktuBukti, pesanDibuka, PESAN_TUTUP, PESAN_TUTUP_MINGGU } = require('../lib/waktu');
 const { buatRingkasan, tambahRiwayat, buatRingkasanKirim, buatAlasan } = require('../lib/ringkas');
@@ -15,9 +15,7 @@ const {
 // Gudang: daftar semua pesanan, terbaru-di-atas
 router.get('/api/pesanan', wajibGudang, async (req, res) => {
   try {
-    const r = await sb.from('pesanan').select('*').order('dibuat_pada', { ascending: false });
-    if (r.error) throw new Error(r.error.message);
-    const daftar = r.data.map(x => pesananKeJson(x));
+    const daftar = (await ambilSemua(() => sb.from('pesanan').select('*').order('dibuat_pada', { ascending: false }))).map(x => pesananKeJson(x));
     for (const d of daftar) d.items = await terapkanSatuanLive(d.items);
     // Stok live per line agar kartu BARU bisa flag stok-0 sebelum diputus (best-effort).
     try {
@@ -80,9 +78,7 @@ router.get('/api/pesan/:token', wajibOutlet, async (req, res) => {
       }
     } catch { infoKirim = {}; }
 
-    const sp = await sb.from('pesanan').select('*').eq('token_outlet', String(req.params.token).trim()).order('dibuat_pada', { ascending: false });
-    if (sp.error) throw new Error(sp.error.message);
-    const milik = sp.data.map(x => {
+    const milik = (await ambilSemua(() => sb.from('pesanan').select('*').eq('token_outlet', String(req.params.token).trim()).order('dibuat_pada', { ascending: false }))).map(x => {
       const id = String(x.id_pesan || '').trim();
       const info = infoKirim[id] || {};
       return pesananKeJson(x, info.idKirim || null, info);

@@ -2,7 +2,7 @@
 // Batal kapan saja pre-SELESAI (tanpa tulis). Arsip read-only.
 const express = require('express');
 const router = express.Router();
-const { sb, nowIso, kurangStock } = require('../../db');
+const { sb, nowIso, kurangStock, ambilSemua } = require('../../db');
 const { wajibGudang } = require('../lib/auth');
 const { catatTransaksi, buatIdSesi, sesiTerbuka } = require('../lib/data');
 const { kanonikSatuan } = require('../lib/konversi');
@@ -16,10 +16,9 @@ async function ambilSesi(id) {
 // Daftar sesi + ringkasan hitungan (terbaru-di-atas; arsip read-only di frontend)
 router.get('/api/opname', wajibGudang, async (req, res) => {
   try {
-    const r = await sb.from('opname_sesi').select('*').order('dibuat_pada', { ascending: false });
-    if (r.error) throw new Error(r.error.message);
+    const sesi = await ambilSemua(() => sb.from('opname_sesi').select('*').order('dibuat_pada', { ascending: false }));
     const out = [];
-    for (const s of r.data || []) {
+    for (const s of sesi) {
       const it = await sb.from('opname_item').select('fisik_qty,sistem_qty').eq('id_sesi', s.id_sesi);
       if (it.error) throw new Error(it.error.message);
       const rows = it.data || [];

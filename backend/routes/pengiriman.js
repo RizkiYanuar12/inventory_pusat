@@ -1,7 +1,7 @@
 // Route pengiriman + notifikasi + surat jalan cetak.
 const express = require('express');
 const router = express.Router();
-const { sb } = require('../../db');
+const { sb, ambilSemua } = require('../../db');
 const { wajibGudang } = require('../lib/auth');
 const { jakartaParts, formatWaktuBukti, bulanDariWaktuBukti, tglSingkatDariWaktuBukti, NAMA_BULAN } = require('../lib/waktu');
 const { tambahRiwayat } = require('../lib/ringkas');
@@ -12,9 +12,7 @@ const {
 
 router.get('/api/pengiriman', wajibGudang, async (req, res) => {
   try {
-    const r = await sb.from('pengiriman').select('*').order('dibuat_pada', { ascending: false });
-    if (r.error) throw new Error(r.error.message);
-    const daftar = r.data.map(x => pengirimanKeJson(x));
+    const daftar = (await ambilSemua(() => sb.from('pengiriman').select('*').order('dibuat_pada', { ascending: false }))).map(x => pengirimanKeJson(x));
     for (const d of daftar) d.items = await terapkanSatuanLive(d.items);
     res.json(daftar);
   } catch (err) {
@@ -137,10 +135,9 @@ router.post('/api/notifikasi/baca', wajibGudang, async (req, res) => {
 // Baris PENUHI = `jumlahKirim` hasil keputusan gudang (termasuk parsial) — juga bahan dokumen unduhan.
 async function agregatPembelian(bulan) {
   const [kirim, ref] = await Promise.all([
-    sb.from('pengiriman').select('id_kirim,outlet,status,tanggal_kirim,items_json').in('status', ['DIKIRIM', 'DITERIMA', 'DITERIMA SEBAGIAN']),
+    ambilSemua(() => sb.from('pengiriman').select('id_kirim,outlet,status,tanggal_kirim,items_json').in('status', ['DIKIRIM', 'DITERIMA', 'DITERIMA SEBAGIAN'])),
     sb.from('barang_inventory').select('id_barang,satuan,harga_barang'),
   ]);
-  if (kirim.error) throw new Error(kirim.error.message);
   if (ref.error) throw new Error(ref.error.message);
   const refMap = new Map((ref.data || []).map(b => [String(b.id_barang).trim(), b]));
 
@@ -151,7 +148,7 @@ async function agregatPembelian(bulan) {
     const [d, m, y] = t.split('/');
     return y && m && d ? `${y}${m}${d}` : '';
   };
-  kirim.data = (kirim.data || []).sort((a, b) =>
+  kirim.sort((a, b) =>
     urutTanggal(b).localeCompare(urutTanggal(a)) ||
     String(b.id_kirim || '').localeCompare(String(a.id_kirim || ''))
   );
@@ -161,7 +158,7 @@ async function agregatPembelian(bulan) {
   let total = 0;
   let tanpaHarga = 0;
   let jumlahKiriman = 0;
-  for (const k of kirim.data) {
+  for (const k of kirim) {
     if (bulanDariWaktuBukti(k.tanggal_kirim) !== bulan) continue;
     let items = k.items_json;
     if (typeof items === 'string') { try { items = JSON.parse(items || '[]'); } catch { items = []; } }

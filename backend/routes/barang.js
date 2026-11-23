@@ -1,7 +1,7 @@
 // Route barang + transaksi (potong-pindah murni dari server.js lama).
 const express = require('express');
 const router = express.Router();
-const { sb, nowIso, kurangStock } = require('../../db');
+const { sb, nowIso, kurangStock, ambilSemua } = require('../../db');
 const { wajibGudang } = require('../lib/auth');
 const { formatWaktuBukti } = require('../lib/waktu');
 const { hitungAvg, kanonikSatuan } = require('../lib/konversi');
@@ -60,11 +60,11 @@ router.get("/api/barang", wajibGudang, async (req, res) => {
   }
 });
 
-router.get("/api/transaksi", wajibGudang, async(req, res) => {
+router.get('/api/transaksi', wajibGudang, async (req, res) => {
   try{
-    const r = await sb.from('transaksi').select('*').order('dibuat_pada', { ascending: true });
-    if (r.error) throw new Error(r.error.message);
-    const data = r.data.map(row => ({
+    const data = (await ambilSemua(() => sb.from('transaksi').select('*')
+      .order('dibuat_pada', { ascending: true })
+      .order('id_transaksi', { ascending: true }))).map(row => ({
       timestamp: row.dibuat_pada ? formatWaktuBukti(row.dibuat_pada) : '-',
       idBarang: row.id_barang,
       nama: row.nama_barang,
