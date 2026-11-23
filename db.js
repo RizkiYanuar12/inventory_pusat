@@ -11,7 +11,7 @@ function ambilEnv(...nama) {
 }
 
 const SUPABASE_URL = ambilEnv('SUPABASE_URL', 'VITE_SUPABASE_URL');
-const SUPABASE_KEY = ambilEnv('SUPABASE_SERVICE_KEY', 'SUPABASE_SERVICE_ROLE', 'VITE_SUPABASE_SERVICE_ROLE', 'supabase_service_role');
+const SUPABASE_KEY = ambilEnv('SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE', 'VITE_SUPABASE_SERVICE_ROLE');
 if (!SUPABASE_URL || !SUPABASE_KEY) console.warn('db.js: ENV Supabase belum lengkap.');
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
